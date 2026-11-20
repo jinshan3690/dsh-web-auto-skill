@@ -78,6 +78,22 @@ def _extract_value(cmd: str, field_key: str, control: dict) -> str | None:
     label_words = FIELD_DICT.get(field_key, [])
     joined = "|".join(re.escape(w) for w in label_words)
 
+    # 其他字段的标签词：命中值若以它们开头，说明是「费用类型住宿」这类复合词被误切，
+    # 不是这个字段的值（例如把 amount 抽成 "类型火车票"）。
+    other_labels = {
+        w for k, v in FIELD_DICT.items() if k != field_key for w in v if len(w) >= 2
+    }
+
+    # 0) 金额类只认数字：金额/费用后面不会跟中文描述
+    if field_key == "amount":
+        m = re.search(
+            r"(?:金额|费用|价格|amount|money)\s*[:：是为]?\s*(\d+(?:\.\d+)?)",
+            cmd,
+            re.IGNORECASE,
+        )
+        if m:
+            return m.group(1)
+
     # 1) 「字段：值」或「字段 值」模式
     pattern = (
         "(?:" + joined + ")"
@@ -87,7 +103,7 @@ def _extract_value(cmd: str, field_key: str, control: dict) -> str | None:
     m = re.search(pattern, cmd, re.IGNORECASE)
     if m:
         val = m.group(1).strip()
-        if val and val not in ("的", "填"):
+        if val and val not in ("的", "填") and not any(val.startswith(w) for w in other_labels):
             return val
 
     # 2) 金额 / 数字

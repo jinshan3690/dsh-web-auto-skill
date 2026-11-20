@@ -2,7 +2,6 @@
 
 用途：手动跑一次，检查库里所有 Skill 对应页面是否改版
 """
-import json
 
 from playwright.async_api import async_playwright
 

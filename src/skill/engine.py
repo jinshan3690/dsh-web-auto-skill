@@ -6,7 +6,7 @@
 判定输入：一次已完成的 trace
 判定输出：(should_learn, reason)
 """
-from src.skill.skill_store import list_skills
+from src.skill.skill_store import list_skills_any_scene
 
 
 def decide_learn(trace_meta: dict, steps: list[dict], success: bool) -> tuple[bool, str]:
@@ -37,18 +37,20 @@ def decide_learn(trace_meta: dict, steps: list[dict], success: bool) -> tuple[bo
 
     page_key = trace_meta.get("page_key", "")
     role = trace_meta.get("role", "default")
-    scene_tag = trace_meta.get("scene_tag", "default")
-    source = trace_meta.get("skill_source", "")
 
-    siblings = list_skills(page_key, role, scene_tag)
+    # 判重范围是「同页面 + 同角色」，不看 scene_tag：
+    # scene_tag 是调用方随手打的标签，只按它判重会导致同一个页面被反复学成多条。
+    siblings = list_skills_any_scene(page_key, role)
 
     if not siblings:
         return True, "冷启动：无同类 Skill，建立基线"
 
-    if source == "reused":
-        # 复用了 Skill 但指纹不一致 -> 页面改版
-        if trace_meta.get("fingerprint_mismatch"):
-            return True, "页面结构变更，旧 Skill 失效，学习新模板"
+    if trace_meta.get("fingerprint_mismatch"):
+        # 指纹不一致说明页面结构变了，旧模板不可信，需要重新学
+        return True, "页面结构变更，旧 Skill 失效，学习新模板"
+
+    if trace_meta.get("coverage_gap"):
+        return True, "已有 Skill 覆盖字段不全，补充完整版本"
 
     if trace_meta.get("human_repair"):
         return True, "人工修复后跑通，沉淀新经验"

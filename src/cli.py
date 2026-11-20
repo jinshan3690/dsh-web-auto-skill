@@ -1,7 +1,6 @@
 """WebSkill CLI 入口"""
 import asyncio
 import json
-import uuid
 
 import typer
 from rich.console import Console
@@ -294,7 +293,7 @@ def cmd_embed_setup(
     except Exception as e:
         console.print(f"[red]下载失败: {e}[/red]")
         console.print("可手动设置 HF_ENDPOINT 换源，或直接跳过（会降级为 n-gram 检索）")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
     console.print(info)
 
     from src.llm.embed import backend_detail

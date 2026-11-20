@@ -1,14 +1,19 @@
 # 依赖清单（pyproject 之外的快速安装用）
 # pip install -r requirements.txt
+
+# 核心
 playwright>=1.48.0
 openai>=1.0.0
 pydantic>=2.0
 python-dotenv>=1.0
-tenacity>=8.0
 rich>=13.0
 numpy>=1.26
-sentence-transformers>=3.0
 fastapi>=0.110
 uvicorn>=0.29.0
 pillow>=10.0
 typer>=0.12
+
+# 语义召回（22MB ONNX 模型，无需 PyTorch；装不上也不影响核心功能，会自动降级）
+onnxruntime>=1.20
+tokenizers>=0.15
+huggingface_hub>=0.23

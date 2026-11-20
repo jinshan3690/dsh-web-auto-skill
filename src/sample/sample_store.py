@@ -29,9 +29,30 @@ def sanitize(obj):
     return obj
 
 
+_NAME_PATTERN = re.compile(r"(申请人|姓名|填表人)[\s:：]*([\u4e00-\u9fa5]{2,4})")
+
+
+def _devalue(text: str, params: dict) -> str:
+    """把摘要里出现过的参数原始值换成占位符，避免把业务数据带出去"""
+    if not isinstance(text, str):
+        return text
+    for key, meta in (params or {}).items():
+        ex = meta.get("example") if isinstance(meta, dict) else None
+        if isinstance(ex, str) and len(ex) >= 2:
+            text = text.replace(ex, "{{" + key + "}}")
+    # 兜底：申请人后跟的中文姓名
+    text = _NAME_PATTERN.sub(lambda m: m.group(1) + "{{name}}", text)
+    return text
+
+
 def contribute_sample(skill: dict, contributor: str = "anonymous") -> str:
     sample_id = f"sample-{uuid.uuid4().hex[:12]}"
     cleaned = sanitize(skill)
+    params = cleaned.get("params") or {}
+    cleaned["summary"] = _devalue(cleaned.get("summary", ""), params)
+    for step in cleaned.get("steps", []):
+        if isinstance(step.get("desc"), str):
+            step["desc"] = _devalue(step["desc"], params)
     cleaned.pop("contract_fingerprint", None)  # 指纹不共享，避免泄露页面结构
     payload = json.dumps(cleaned, ensure_ascii=False)
 

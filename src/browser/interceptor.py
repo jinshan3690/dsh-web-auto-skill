@@ -24,10 +24,20 @@ def check_action(risk: str, step_desc: str = "") -> tuple[bool, str]:
 
 
 def confirm_high_risk(step_desc: str) -> bool:
-    """CLI 场景下的高危动作交互确认"""
+    """CLI 场景下的高危动作交互确认
+
+    非交互式场景（脚本、后台任务、CI）必须立即拒绝而不是挂起等 stdin ——
+    否则整个进程会卡死在那里，看起来像「卡住了」。
+    """
+    import sys
+
     import typer
+
     audit_log("risk_confirm", f"high 风险动作待确认: {step_desc}", "等待用户确认")
     try:
+        if not sys.stdin.isatty():
+            audit_log("risk_confirm", step_desc, "非交互式终端，按拒绝处理")
+            return False
         return typer.confirm(f"HIGH 风险动作: {step_desc}，是否继续执行？", default=False)
     except Exception:
         return False

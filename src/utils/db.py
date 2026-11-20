@@ -8,7 +8,8 @@ from src.config import DB_PATH, ensure_dirs
 @contextmanager
 def get_conn():
     ensure_dirs()
-    conn = sqlite3.connect(str(DB_PATH))
+    # timeout：并发写入时等待而不是立刻抛 "database is locked"
+    conn = sqlite3.connect(str(DB_PATH), timeout=10)
     conn.row_factory = sqlite3.Row
     try:
         yield conn
@@ -24,6 +25,12 @@ def init_db():
     ensure_dirs()
     with get_conn() as conn:
         cur = conn.cursor()
+        # WAL：读写不互斥，Web 服务与 CLI 同时跑时更稳
+        try:
+            cur.execute("PRAGMA journal_mode=WAL")
+            cur.execute("PRAGMA busy_timeout=5000")
+        except Exception:
+            pass
         cur.execute("""
         CREATE TABLE IF NOT EXISTS skills (
             skill_id TEXT,

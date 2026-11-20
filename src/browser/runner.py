@@ -1,11 +1,10 @@
 """浏览器执行主循环：懒校验 + 执行 + trace + 自动学习"""
-import json
+import asyncio
 import traceback
 import uuid
 from typing import Callable, Awaitable
 
 from playwright.async_api import Page, async_playwright
-from tenacity import retry, stop_after_attempt, wait_fixed
 
 from src.audit.logger import audit_log
 from src.browser.branch_resolver import resolve_branch
@@ -14,7 +13,7 @@ from src.browser.interceptor import check_action
 from src.browser.risk_detector import detect_risk
 from src.config import (
     AUTO_LEARN, BROWSER_HEADLESS, CHROMIUM_CHANNEL, PAGE_LOAD_TIMEOUT,
-    HUMAN_HINT, SCREENSHOT_DIR, SEMANTIC_TOP_K, SKILL_MATCH_THRESHOLD, STEP_TIMEOUT,
+    HUMAN_HINT, SCREENSHOT_DIR, STEP_TIMEOUT,
     ensure_dirs,
 )
 from src.llm.planner import plan_task
@@ -24,10 +23,9 @@ from src.skill.parameterizer import (
     extract_params_from_cmd, has_unresolved, parameterize_steps, render_steps,
 )
 from src.llm.reflector import reflect_trace
-from src.skill.dry_run import dry_run_skill
 from src.skill.engine import condense_steps, decide_learn
 from src.skill.skill_store import (
-    deprecate_skill, list_skills, match_skill, save_skill, semantic_recall,
+    candidates_by_fp, deprecate_skill, list_skills_any_scene, match_skill, save_skill,
 )
 from src.trace.recorder import TraceRecorder
 
@@ -150,20 +148,34 @@ async def _run_plan(
     return True
 
 
-@retry(stop=stop_after_attempt(2), wait=wait_fixed(800))
 async def _execute_once(page: Page, step: dict) -> tuple[bool, str]:
     ok, detail = await execute_step(page, step)
-    if not ok and step.get("action") in ("goto", "fill", "click", "read", "wait"):
+    if not ok and step.get("action") in ("goto", "fill", "read", "wait", "select"):
         # 元素/时序类失败可重试；语义类失败（checkpoint/未知动作）直接返回
         raise RuntimeError(detail)
     return ok, detail
 
 
+RETRYABLE = {"goto", "fill", "read", "wait", "select"}
+
+
 async def _execute_with_retry(page: Page, step: dict) -> tuple[bool, str]:
-    try:
-        return await _execute_once(page, step)
-    except Exception as e:
-        return False, str(e)
+    """重试策略：只有幂等动作重试。
+
+    click 是非幂等的 —— 第一次其实点成功了、只是等待超时被判定失败，
+    再点一次就是重复提交。所以 click 一律只执行一次。
+    """
+    action = step.get("action")
+    attempts = 2 if action in RETRYABLE else 1
+    last = ""
+    for i in range(attempts):
+        try:
+            return await _execute_once(page, step)
+        except Exception as e:
+            last = f"{type(e).__name__}: {e}"
+            if i + 1 < attempts:
+                await asyncio.sleep(0.8)
+    return False, last
 
 
 async def run_task(
@@ -247,19 +259,82 @@ async def run_task_detailed(
                 raise ValueError(f"NEED_HUMAN: {tip}（headless 模式下请改用有头浏览器）")
 
             # ---------- 懒校验：现场比对指纹 ----------
-            skill = match_skill(page_key, role, scene_tag, fingerprint)
-            siblings = list_skills(page_key, role, scene_tag)
+            # 调用方显式给了步骤（/task/execute、--plan-file）就照做，不去碰库里的 Skill。
+            # 这是契约：传了 steps 的行为必须确定，不能被"学到的 Skill"悄悄替换。
+            if plan_override:
+                plan = plan_override
+                plan_source = "external"
+                recorder.set_meta("skill_source", "external")
+                audit_log("plan_external", "调用方", f"外部传入 {len(plan)} 个步骤")
+                skill = None
+            else:
+                # 本次指令要求操作的控件集合（本地规则能算出来就用它做覆盖度校验）
+                required_targets: set[str] = set()
+                try:
+                    preview = plan_locally(user_cmd, contract)
+                    required_targets = {
+                        s.get("target") for s in preview
+                        if s.get("action") in ("fill", "select") and s.get("target")
+                    }
+                except PlanningError:
+                    pass
 
+            sisters = list_skills_any_scene(page_key, role)
+
+            # 统一选择：候选必须「本次能渲染」——覆盖要操作的控件，且参数都能填上。
+            # 只判覆盖不够：库里可能有一条 4 参数 Skill，本次只给了 3 个值，
+            # 硬复用就会 MISSING_PARAMS 失败，其实另一条 3 参数 Skill 完全够用。
+            chosen, chosen_plan = None, None
+            if not plan_override:
+                pool: list[dict] = []
+                exact = match_skill(page_key, role, scene_tag, fingerprint)
+                if exact:
+                    pool.append(exact)
+                pool += [
+                    s for s in candidates_by_fp(page_key, role, fingerprint)
+                    if not exact or s.get("skill_id") != exact.get("skill_id")
+                ]
+
+                def _usable(sk: dict) -> list[dict] | None:
+                    if required_targets:
+                        targets = {st.get("target") for st in sk.get("steps", [])}
+                        if not set(required_targets) <= targets:
+                            return None
+                    try:
+                        return _render_skill_plan(sk, params, user_cmd)
+                    except Exception:
+                        return None
+
+                # 参数需求少的优先（更容易被本次指令满足）
+                for cand in sorted(pool, key=lambda s: len(s.get("params") or {})):
+                    steps_out = _usable(cand)
+                    if steps_out:
+                        chosen, chosen_plan = cand, steps_out
+                        break
+
+                if pool and not chosen:
+                    audit_log(
+                        "skill_not_usable", page_key,
+                        f"{len(pool)} 个候选均无法用本次参数渲染，重新规划",
+                    )
+                    recorder.set_meta("coverage_gap", 1)
+
+            skill = chosen
             if skill:
-                audit_log("skill_hit", skill["skill_id"], "精准匹配命中，复用 Skill")
+                reuse_kind = "精准匹配" if exact and skill.get("skill_id") == exact.get("skill_id") else "同页面同指纹"
+                audit_log("skill_hit", skill["skill_id"], f"{reuse_kind}命中，复用 Skill")
                 recorder.set_meta("skill_source", "reused")
                 plan_source = "skill"
-                plan = _render_skill_plan(skill, params, user_cmd)
+                plan = chosen_plan
                 if not plan:
                     raise ValueError("命中的 Skill steps 为空")
+            elif plan_override:
+                pass  # 已在上面处理，plan / plan_source 就位
             else:
-                if siblings:
-                    old = siblings[0]
+                # 指纹不一致的旧 Skill：同页面同角色下，指纹不同的那条已不可信
+                stale = [s for s in sisters if s.get("contract_fingerprint") != fingerprint]
+                if stale:
+                    old = stale[0]
                     recorder.set_meta("skill_source", "reused")
                     recorder.set_meta("fingerprint_mismatch", 1)
                     audit_log(
@@ -271,12 +346,7 @@ async def run_task_detailed(
                 else:
                     recorder.set_meta("skill_source", "replanned")
 
-                if plan_override:
-                    plan = plan_override
-                    plan_source = "external"
-                    recorder.set_meta("skill_source", "external")
-                    audit_log("plan_external", "调用方", f"外部传入 {len(plan)} 个步骤")
-                elif llm_available():
+                if llm_available():
                     plan = await plan_task(user_cmd, contract)
                     plan_source = "llm"
                     audit_log("replan", "LLM", f"生成 {len(plan)} 个步骤")
@@ -286,7 +356,7 @@ async def run_task_detailed(
                         plan_source = "local"
                         audit_log("replan_local", "规则规划器", f"生成 {len(plan)} 个步骤")
                     except PlanningError as pe:
-                        raise RuntimeError(f"NO_PLANNER: {pe}")
+                        raise RuntimeError(f"NO_PLANNER: {pe}") from pe
 
             success = await _run_plan(page, plan, skill, recorder, confirm)
 
