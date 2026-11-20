@@ -1,6 +1,6 @@
 [project]
 name = "webskill"
-version = "0.2.3"
+version = "0.2.4"
 description = "WebSkill - 给 Agent 用的网页操作 Skill 引擎：跑一次、学一条、下次直接复用"
 readme = "README.md"
 license = "MIT"

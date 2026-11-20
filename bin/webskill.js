@@ -156,6 +156,33 @@ function installEnginePackage() {
   return run(VENV_PY, args, {}, ROOT) === 0;
 }
 
+// 与 webskill/config.py 的 _detect_browser_channel 保持一致：
+// 系统已经装了 Chrome/Edge/Brave 就不要再下 130MB Chromium。
+function systemBrowser() {
+  if (process.env.CHROMIUM_CHANNEL) return process.env.CHROMIUM_CHANNEL;
+  const probes =
+    process.platform === "darwin"
+      ? [
+          ["chrome", "/Applications/Google Chrome.app"],
+          ["msedge", "/Applications/Microsoft Edge.app"],
+          ["brave", "/Applications/Brave Browser.app"],
+        ]
+      : process.platform === "win32"
+        ? [
+            ["chrome", "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"],
+            ["msedge", "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe"],
+            ["brave", "C:\\Program Files\\BraveSoftware\\Brave-Browser\\Application\\brave.exe"],
+          ]
+        : [
+            ["chrome", "/usr/bin/google-chrome"],
+            ["chrome", "/usr/bin/google-chrome-stable"],
+            ["msedge", "/usr/bin/microsoft-edge"],
+            ["brave", "/usr/bin/brave-browser"],
+          ];
+  for (const [name, file] of probes) if (fs.existsSync(file)) return name;
+  return "";
+}
+
 function setup({ force = false } = {}) {
   fs.mkdirSync(DEFAULT_STORAGE, { recursive: true });
 
@@ -185,15 +212,18 @@ function setup({ force = false } = {}) {
     process.exit(1);
   }
 
-  if (process.env.WEBSKILL_SKIP_BROWSER === "1") {
+  const reuse = systemBrowser();
+  if (reuse) {
+    info(`检测到系统浏览器，跳过 Chromium 下载（CHROMIUM_CHANNEL=${reuse}）`);
+  } else if (process.env.WEBSKILL_SKIP_BROWSER === "1") {
     info("跳过 Chromium（WEBSKILL_SKIP_BROWSER=1）");
   } else {
-    info("安装 Chromium（playwright，约 130MB）…");
+    info("未找到系统浏览器，下载 Chromium（约 130MB）…");
     // 必须在项目目录之外执行：本仓库根有 package.json，playwright 的 Python CLI 会误认为
     // 这是 Node 项目并转发给 npm 版 CLI，导致安装被跳过。
     const browserHost = DEFAULT_STORAGE;
     if (run(VENV_PY, ["-m", "playwright", "install", "chromium"], {}, browserHost) !== 0) {
-      info("Chromium 安装失败；若本机已有 Chrome/Brave，可设 CHROMIUM_CHANNEL=chrome 后继续");
+      info("Chromium 安装失败；装个 Chrome 后设 CHROMIUM_CHANNEL=chrome 即可，无需重试下载");
     }
   }
 

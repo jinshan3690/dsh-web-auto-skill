@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.2.4 (2026-11-20)
+
+### 变更
+- **安装只走 npx，不再需要手动 pip**：文档只保留两条命令——`npx skills add`（装说明书）
+  与 `npx -y github:jinshan3690/dsh-web-auto-skill setup`（装引擎）；`install-engine.sh`
+  降级为 GitHub/pypi 不可达时的离线兜底，不再出现在安装说明里
+- **不再下载 Chromium**：`setup` 与运行时都会探测系统 Chrome / Edge / Brave，命中就直接用
+  （`CHROMIUM_CHANNEL=chrome`），省掉约 130MB 下载；都没有才回退 playwright 自带 chromium
+
 ## v0.2.3 (2026-11-20)
 
 ### 变更

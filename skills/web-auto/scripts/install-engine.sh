@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
-# 安装 WebSkill 引擎（Python 包 + `web-auto-skill` 命令 + Chromium）
+# 安装 WebSkill 引擎（Python 包 + `web-auto-skill` 命令）
 #
-# 为什么需要这一步：`npx skills add` 只把 SKILL.md 装进 Agent 的 skills 目录，
-# 它不会安装 Python 引擎，也不会生成命令行。SKILL.md 第 0 节发现引擎不存在时调用本脚本。
+# 主安装入口是 `npx -y github:jinshan3690/dsh-web-auto-skill setup`（跨平台，也是文档里唯一写的）。
+# 本脚本是它的离线等价物：GitHub 或 pypi 不可达、或想装本地改动时用。
+#   WEBSKILL_REPO=<本地仓库目录> bash install-engine.sh
+# 两者共用同一个 venv（~/.webskill/.venv），重复执行不会各装一份。
 #
 # 可用环境变量：
 #   WEBSKILL_HOME      安装目录（默认 ~/.webskill）

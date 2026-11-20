@@ -1,5 +1,7 @@
 """全局配置"""
 import os
+import shutil
+import sys
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -39,8 +41,47 @@ HUMAN_HINT = os.getenv("HUMAN_HINT", "true").lower() == "true"
 
 # 浏览器
 BROWSER_HEADLESS = os.getenv("BROWSER_HEADLESS", "false").lower() == "true"
+
+
+def _detect_browser_channel() -> str:
+    """默认复用系统已装的浏览器，新用户不用为跑一条命令再下载 130MB Chromium。
+
+    顺序 Chrome → Edge → Brave → playwright 自带 chromium。
+    显式设了 CHROMIUM_CHANNEL 就以它为准（设成空串表示用自带 chromium）。
+    """
+    env = os.getenv("CHROMIUM_CHANNEL")
+    if env is not None:
+        return env or "chromium"
+
+    if sys.platform == "darwin":
+        for channel, app in (
+            ("chrome", "/Applications/Google Chrome.app"),
+            ("msedge", "/Applications/Microsoft Edge.app"),
+            ("brave", "/Applications/Brave Browser.app"),
+        ):
+            if os.path.exists(app):
+                return channel
+    elif sys.platform.startswith("win"):
+        for channel, exe in (
+            ("chrome", r"C:\Program Files\Google\Chrome\Application\chrome.exe"),
+            ("msedge", r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"),
+            ("brave", r"C:\Program Files\BraveSoftware\Brave-Browser\Application\brave.exe"),
+        ):
+            if os.path.exists(exe):
+                return channel
+    else:
+        for channel, names in (
+            ("chrome", ("google-chrome", "google-chrome-stable")),
+            ("msedge", ("microsoft-edge",)),
+            ("brave", ("brave-browser",)),
+        ):
+            if any(shutil.which(n) for n in names):
+                return channel
+    return "chromium"
+
+
 # 使用完整 Chromium 而非 headless-shell：headless-shell 的渲染稳定性检测会让 click 卡住
-CHROMIUM_CHANNEL = os.getenv("CHROMIUM_CHANNEL", "chromium") or None
+CHROMIUM_CHANNEL = _detect_browser_channel() or None
 PAGE_LOAD_TIMEOUT = int(os.getenv("PAGE_LOAD_TIMEOUT", "15000"))
 STEP_TIMEOUT = int(os.getenv("STEP_TIMEOUT", "5000"))
 
