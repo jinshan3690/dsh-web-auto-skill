@@ -19,12 +19,12 @@ sys.path.insert(0, str(ROOT))
 
 from playwright.async_api import async_playwright
 
-from src.browser.contract_scanner import scan_contract
-from src.browser.runner import _run_plan
-from src.config import CHROMIUM_CHANNEL, ensure_dirs
-from src.skill.skill_store import save_skill, match_skill
-from src.trace.recorder import TraceRecorder
-from src.utils.db import init_db
+from webskill.browser.contract_scanner import scan_contract
+from webskill.browser.runner import _run_plan
+from webskill.config import CHROMIUM_CHANNEL, ensure_dirs
+from webskill.skill.skill_store import match_skill, save_skill
+from webskill.trace.recorder import TraceRecorder
+from webskill.utils.db import init_db
 
 DEMO_URL = (ROOT / "examples" / "demo_form.html").resolve().as_uri()
 
@@ -46,7 +46,7 @@ async def main():
         await page.close()
 
         # ---- 2. 写入种子 Skill（幂等：先清掉旧的 demo skill） ----
-        from src.utils.db import get_conn
+        from webskill.utils.db import get_conn
         with get_conn() as conn:
             conn.execute("DELETE FROM skills WHERE skill_id='skill-demo-reimburse'")
 
@@ -83,13 +83,15 @@ async def main():
             async def confirm(_desc: str) -> bool:
                 return confirm_answer
 
-            ok = await _run_plan(pg, plan, None, rec, confirm)
+            ok, reason = await _run_plan(pg, plan, None, rec, confirm)
             rec.save(ok)
             await pg.close()
             print(f"[{name}] ok={ok}")
             for s in rec.steps:
                 flag = s.get("reason") or s.get("error") or ""
                 print(f"   - {s.get('action')} {s.get('target', '')} -> {s.get('status')} {flag}")
+            if reason:
+                print(f"   原因: {reason}")
             return ok, rec.steps
 
         ok, _ = await case("low-auto", [

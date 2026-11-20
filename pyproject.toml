@@ -1,8 +1,15 @@
 [project]
 name = "webskill"
-version = "0.1.0"
-description = "WebSkill - LLM + Playwright 网页操作 Skill 引擎"
+version = "0.2.1"
+description = "WebSkill - 给 Agent 用的网页操作 Skill 引擎：跑一次、学一条、下次直接复用"
+readme = "README.md"
+license = "MIT"
 requires-python = ">=3.10"
+keywords = ["agent", "browser-automation", "playwright", "skill", "llm"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Operating System :: OS Independent",
+]
 dependencies = [
   "playwright>=1.48.0",
   "openai>=1.0.0",
@@ -12,29 +19,30 @@ dependencies = [
   "numpy>=1.26",
   "fastapi>=0.110",
   "uvicorn>=0.29.0",
-  "pillow>=10.0",
   "typer>=0.12",
 ]
 
 [project.optional-dependencies]
 # 推荐：ONNX 版中文向量，22MB，无需 PyTorch，任何 Python 版本都能装
-# pip install -e ".[onnx]"
 onnx = ["onnxruntime>=1.20", "tokenizers>=0.15", "huggingface_hub>=0.23"]
 # 备选：sentence-transformers 版（需要 PyTorch，仅老版本 Python 有 wheel）
 embed = ["sentence-transformers>=3.0"]
-dev = ["pytest>=8.0"]
+dev = ["pytest>=8.0", "httpx>=0.27"]
 
+[project.urls]
+Homepage = "https://github.com/jinshan3690/dsh-web-auto-skill"
+Issues = "https://github.com/jinshan3690/dsh-web-auto-skill/issues"
 
 [project.scripts]
-webskill = "src.cli:app"
+webskill = "webskill.cli:app"
 
 
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
-include = ["src*"]
+include = ["webskill*"]
 
 
 [tool.ruff]
@@ -45,3 +53,6 @@ target-version = "py310"
 # 中文项目：不启用 RUF001-003（全角标点）与 S/BLE（刻意宽泛捕获）
 select = ["F", "E9", "B", "I"]
 ignore = ["RUF059"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

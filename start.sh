@@ -19,10 +19,10 @@ if [ ! -f ".env" ]; then
 fi
 
 # 语义召回模型（22MB，可选；下载失败不影响使用，会自动降级）
-if ! python -c "from src.llm.embed_onnx import model_ready; raise SystemExit(0 if model_ready() else 1)" 2>/dev/null; then
-  echo "可选：python -m src embed-setup  （下载 22MB 中文向量模型，提升 Skill 召回精度）"
+if ! python -c "from webskill.llm.embed_onnx import model_ready; raise SystemExit(0 if model_ready() else 1)" 2>/dev/null; then
+  echo "可选：python -m webskill embed-setup  （下载 22MB 中文向量模型，提升 Skill 召回精度）"
 fi
 
-python -m src init
+python -m webskill init
 echo "启动 Web API：http://127.0.0.1:8000/docs"
-python -m src web
+python -m webskill web

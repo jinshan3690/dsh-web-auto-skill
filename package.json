@@ -1,13 +1,13 @@
 {
   "name": "webskill",
-  "version": "0.1.0",
+  "version": "0.2.1",
   "description": "Web operation skill engine: drive a real browser, then replay parameterized skills without calling a model.",
   "bin": {
     "webskill": "bin/webskill.js"
   },
   "files": [
     "bin",
-    "src",
+    "webskill",
     "examples",
     "docs",
     "pyproject.toml",

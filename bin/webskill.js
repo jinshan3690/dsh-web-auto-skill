@@ -3,7 +3,7 @@
 /**
  * webskill launcher — 让 `npx webskill` / `npx github:jinshan3690/dsh-web-auto-skill` 直接可用。
  *
- * 它只做三件事：找到可用的 Python（>=3.10）、准备一个隔离的 .venv、把命令转发给 `python -m src`。
+ * 它只做三件事：找到可用的 Python（>=3.10）、准备一个隔离的 .venv、把命令转发给 `python -m webskill`。
  * 首次运行会安装依赖和 Chromium（几分钟），之后走缓存。用户数据默认落在 ~/.webskill。
  */
 const { spawnSync } = require("node:child_process");
@@ -19,11 +19,13 @@ const DATA_HOME = process.env.WEBSKILL_HOME || path.join(os.homedir(), ".webskil
 // 因此 npx 场景把 venv 放到数据目录，本地源码开发仍复用项目内 .venv。
 const IS_NPX_CACHE = /[\\/]_npx[\\/]/.test(ROOT);
 const LOCAL_VENV = path.join(ROOT, ".venv");
+// npx 场景与 skills/install-engine.sh 共用同一个 venv（~/.webskill/.venv），
+// 否则两条入口会各装一份依赖（各约 300MB），还互相看不见。
 const VENV_DIR = IS_NPX_CACHE
-  ? path.join(DATA_HOME, "venv")
+  ? path.join(DATA_HOME, ".venv")
   : fs.existsSync(LOCAL_VENV)
     ? LOCAL_VENV
-    : path.join(DATA_HOME, "venv");
+    : path.join(DATA_HOME, ".venv");
 const VENV_PY =
   process.platform === "win32"
     ? path.join(VENV_DIR, "Scripts", "python.exe")
@@ -72,6 +74,17 @@ function venvReady() {
   return fs.existsSync(VENV_PY) && supportsCmd(VENV_PY);
 }
 
+// venv 存在不等于装好了 —— install-engine.sh 也会往同一个 venv 里装东西。
+// 这里探一下能不能 import，避免两条入口各装一遍。
+function engineReady() {
+  if (!venvReady()) return false;
+  const probe = spawnSync(VENV_PY, ["-c", "import webskill.cli"], {
+    stdio: "ignore",
+    env: { ...process.env, PYTHONPATH: ROOT },
+  });
+  return probe.status === 0;
+}
+
 function setup({ force = false } = {}) {
   fs.mkdirSync(DEFAULT_STORAGE, { recursive: true });
 
@@ -113,10 +126,9 @@ function setup({ force = false } = {}) {
 }
 
 function ensure() {
-  if (!venvReady()) {
-    info("首次运行，正在准备环境…");
-    setup();
-  }
+  if (engineReady()) return;
+  info("首次运行，正在准备环境…");
+  setup();
 }
 
 function detectAgents() {
@@ -228,7 +240,7 @@ async function main() {
   }
 
   ensure();
-  return run(VENV_PY, ["-m", "src", ...args], {
+  return run(VENV_PY, ["-m", "webskill", ...args], {
     STORAGE_ROOT: process.env.STORAGE_ROOT || DEFAULT_STORAGE,
     PYTHONPATH: ROOT,
   });

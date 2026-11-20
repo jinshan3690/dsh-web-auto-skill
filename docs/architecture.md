@@ -64,7 +64,8 @@ run(cmd, page_key)
   │    ├─ 命中 → 复用 steps
   │    └─ 未命中
   │         ├─ 同页面存在旧 Skill（指纹不同）
-  │         │     → deprecate 旧版本 + 记 fingerprint_mismatch
+  │         │     ├─ 首次观测到 → 记 fingerprint_mismatch，先学新模板，不弃用
+  │         │     └─ 连续两次不同 → deprecate 旧版本
   │         └─ 调用 planner 生成新 steps
   ├─ 逐步执行（风险拦截 + 分支）
   ├─ 截图 + trace 落库
@@ -72,6 +73,9 @@ run(cmd, page_key)
 ```
 
 **不跑后台定时巡检**，只在真正要执行的时候现场校验——省资源，也避免"体检"式的无效浏览器开销。
+
+**为什么改版要连续两次才弃用**：A/B 实验、灰度发布、首屏广告位都会让指纹抖动，
+单次不一致就删旧 Skill 会把还能用的版本误判成失效。第一次只学新模板，第二次仍然不同才认定改版。
 
 ## 自动学习决策器
 
@@ -82,7 +86,7 @@ run(cmd, page_key)
 | 存在 critical 被拦截 | 否 | 被阻断的流程不能学 |
 | 无有效成功步骤 | 否 | 学不到东西 |
 | 冷启动（同类无 Skill） | 是 | 建立基线 |
-| 指纹不匹配（页面改版） | 是 | 需要新模板 |
+| 指纹不匹配（页面改版） | 是 | 需要新模板（首次即学，弃用旧版要连续两次） |
 | 已有 Skill 覆盖字段不全 | 是 | 补一条完整版本，避免"少填字段" |
 | 人工修复后跑通 | 是 | 新知识 |
 | 命中新分支 | 是 | 补充分支能力 |
@@ -91,6 +95,11 @@ run(cmd, page_key)
 
 判重范围是「同页面 + 同角色」，**不看 scene_tag**。scene_tag 是调用方随手打的标签，
 只按它判重会导致同一个页面被学成好几条一样的 Skill。
+
+**版本链**：学习时先找 `family_head`（同 page + role + fingerprint 的最新一条），
+若这次流程与它同类（步骤目标集相等或互为子集），就沿用同一个 `skill_id` 递增版本（v1→v2），
+于是 `MAX_SKILL_VERSIONS` 归档、`skill-rollback`、`update_log` 才真正有意义；
+流程完全不同（查询 vs 导出）或指纹变了，才开新链。
 
 ## Skill 复用：三层选择
 
@@ -110,6 +119,9 @@ run(cmd, page_key)
 所以候选是**按参数个数从少到多**逐个试，取第一个能渲染成功的。
 都不可用才重新规划，并把 `coverage_gap` 记进 trace 触发学习，补一条更合适的 Skill。
 
+这段逻辑抽在 `webskill/skill/selector.py`（纯函数，不碰浏览器），因此有独立单测：
+覆盖度、可渲染、参数少优先、精确匹配去重。
+
 另外两点：
 - 调用方显式传了 steps（`/task/execute`、`--plan-file`），**直接照做**，不会被库里的 Skill 悄悄替换 —— 传了步骤就该行为确定
 - `click` 不重试。它是非幂等的：第一次其实点成功了、只是等待超时被判定失败，再点一次就是重复提交。只有 goto/fill/read/wait/select 这类幂等动作重试
@@ -120,14 +132,21 @@ run(cmd, page_key)
 planner / reflector 的 system prompt 明确禁止生成审批类动作。
 
 **第二层：执行层硬拦截（关键）**
-`interceptor.check_action()` 在执行前按 `detect_risk(desc)` 判定：
+`detect_step_risk(step, controls)` 把三样东西拼起来判：`desc` + `target` 选择器 + 契约里该控件的
+`label / nearby_label / name`，再交给 `interceptor.check_action()`：
 
-- `critical`（审批通过 / 驳回 / 付款 / 转账 / 删除账号…）→ **永远返回 False**，LLM 违规也拦住
-- `high`（提交 / 保存 / 删除 / 上传…）→ 返回 False，需要上层确认回调放行
+- `critical`（审批通过 / 驳回 / 付款 / 转账 / 删除账号 / `#approve`…）→ **永远返回 False**，LLM 违规也拦住
+- `high`（提交 / 保存 / 删除 / 上传 / `#submit`…）→ 返回 False，需要上层确认回调放行
 - `low`（填写 / 查询 / 读取 / 翻页）→ 放行
 
-**注意**：风险判定基于「步骤描述文本」，这是 POC 的简化。生产环境应改为
-「目标元素语义 + 按钮文案 + 页面上下文」联合判定，并维护业务侧风险白名单。
+**为什么必须带 target 和控件文案**：`desc` 是可选字段。外部 steps（`/task/execute`、`--plan-file`）
+不写 desc 时，只按描述匹配必然全判 low —— 审批按钮照样点得下去。现在的规则是：
+
+- `desc` 缺失的 `click` 一律抬到 `high`（意图不明就不放行）
+- `target` 与控件真实文案始终参与匹配（`#approve`、按钮文字「审批通过」都能识别）
+
+**遗留边界**：仍以「文本语义」为准，不做视觉理解；按钮文案与业务语义不符（如「确定」实为付款）
+只能靠业务侧白名单补。
 
 ## 语义召回省 token
 
@@ -146,7 +165,7 @@ planner / reflector 的 system prompt 明确禁止生成审批类动作。
 
 ONNX 通路为什么值得单独维护：PyTorch 在新版 Python 上经常没 wheel（3.14 就没有），
 而 onnxruntime 有全平台 wheel。模型文件（`model_int8.onnx` + `tokenizer.json`）由
-`python -m src embed-setup` 一次拉取，落在 `storage/models/bge-small-zh-v1.5/`，
+`python -m webskill embed-setup` 一次拉取，落在 `storage/models/bge-small-zh-v1.5/`，
 不引入任何 npm/JS 生态。
 
 推理细节：WordPiece 分词 → `input_ids/attention_mask/token_type_ids` → `last_hidden_state`
@@ -182,10 +201,35 @@ ONNX 通路为什么值得单独维护：PyTorch 在新版 Python 上经常没 w
 
 ## Trace 与审计
 
-- `traces` 表存完整步骤 + meta（页码/角色/场景/指纹/是否复用/是否改版）
+- `traces` 表存完整步骤 + meta（页码/角色/场景/指纹/是否复用/是否改版）+ 总耗时 `duration_ms`
 - 截图落 `storage/screenshots/{trace_id}.png`
 - 审计事件：`skill_hit / skill_fingerprint_mismatch / replan / risk_block / risk_confirm / step_fail / learn_decision / learn_saved / sample_contribute`
 - 审计同时写 `storage/audit.log` 与 `audit_log` 表，Web 可查
+
+## HTTP 暴露面与并发
+
+引擎的接口等于「让本机浏览器去访问任意 URL 并执行动作」，所以做了四道闸：
+
+| 闸口 | 位置 | 拦住的场景 |
+|---|---|---|
+| `WEBSKILL_API_TOKEN` | `web/main.py` | 任何人连上端口就能驱动你的浏览器 |
+| 协议白名单（http/https） | `security.py` | `file:///etc/passwd` 读本地文件 |
+| 内网地址拒绝 | `security.py` | SSRF 打内网后台、`169.254.169.254` 云元数据 |
+| **每步导航校验** | `runner.check_nav_url` | `steps` 里自带的 `goto`、以及 302 之后的落地地址 |
+
+**为什么入口校验不够**：`page_key` 只是第一个 URL。`/task/execute`、`--plan-file`、`/skill/import`
+都能塞进任意步骤，一个 `{"action":"goto","target":"file:///etc/passwd"}` 配一个 `read body`
+就能把本地文件读进 trace 再取出来。所以校验下沉到执行层的每一条 `goto`，
+并且**跳转之后再看一次 `page.url`** —— 入口是合法公网域名、服务器一个 302 就能落到内网。
+
+默认策略是「安全优先」：内网 OA 这类正常需求要显式 `ALLOW_PRIVATE_NETWORK=true` 才放行，
+本地 `file://` 调试要 `ALLOW_FILE_URL=true`。域名会先解析再判断，挡住 basic SSRF；
+不做 DNS 重绑定防护，也不拦子资源请求（`<img>`/`<iframe>` 拉内网），这两点属于已知边界。
+
+DNS 解析是阻塞调用，放在 `asyncio.to_thread` 里跑 —— 否则一个慢解析会把同进程的其他任务一起卡住。
+
+并发用 `asyncio.Semaphore(MAX_CONCURRENT_TASKS)` 限流（在 lifespan 里创建，避免绑定到错误事件循环），
+每个任务独立浏览器上下文、结束即销毁。没做浏览器池复用：省下的启动时间抵不上状态串味的风险。
 
 ## POC 取舍
 
