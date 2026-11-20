@@ -1,0 +1,6 @@
+[
+  {"action": "fill", "target": "#applicant", "value": "王五", "desc": "填写申请人"},
+  {"action": "fill", "target": "#reason", "value": "上海客户回访", "desc": "填写出差事由"},
+  {"action": "fill", "target": "#amount", "value": "860", "desc": "填写报销金额"},
+  {"action": "checkpoint", "target": "#applicant", "desc": "确认申请人已填写"}
+]

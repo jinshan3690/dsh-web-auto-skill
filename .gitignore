@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# 虚拟环境
+.venv/
+venv/
+
+# 运行产物（含业务数据，不入库）
+storage/
+!storage/.gitkeep
+
+# 配置（含密钥）
+.env
+
+# 系统
+.DS_Store
+.idea/
+.vscode/
+
+# 测试缓存
+.pytest_cache/

@@ -1,0 +1,32 @@
+[project]
+name = "webskill"
+version = "0.1.0"
+description = "WebSkill - LLM + Playwright 网页操作 Skill 引擎"
+requires-python = ">=3.10"
+dependencies = [
+  "playwright>=1.48.0",
+  "openai>=1.0.0",
+  "pydantic>=2.0",
+  "python-dotenv>=1.0",
+  "tenacity>=8.0",
+  "rich>=13.0",
+  "numpy>=1.26",
+  "fastapi>=0.110",
+  "uvicorn>=0.29.0",
+  "pillow>=10.0",
+  "typer>=0.12",
+]
+
+[project.optional-dependencies]
+# 安装语义检索（BGE），需要 torch，体积较大
+# pip install -e ".[embed]"
+embed = ["sentence-transformers>=3.0"]
+dev = ["pytest>=8.0"]
+
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["src*"]
