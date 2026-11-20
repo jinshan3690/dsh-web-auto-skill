@@ -47,9 +47,9 @@ function findPython() {
   process.exit(1);
 }
 
-function run(cmd, args, extraEnv) {
+function run(cmd, args, extraEnv, cwd) {
   const result = spawnSync(cmd, args, {
-    cwd: ROOT,
+    cwd: cwd || ROOT,
     stdio: "inherit",
     env: { ...process.env, ...(extraEnv || {}) },
   });
@@ -90,7 +90,10 @@ function setup({ force = false } = {}) {
   }
 
   info("安装 Chromium（playwright，约 130MB）…");
-  if (run(VENV_PY, ["-m", "playwright", "install", "chromium"]) !== 0) {
+  // 必须在项目目录之外执行：本仓库根有 package.json，playwright 的 Python CLI 会误认为
+  // 这是 Node 项目并转发给 npm 版 CLI，导致安装被跳过。
+  const browserHost = path.join(DATA_HOME, "storage");
+  if (run(VENV_PY, ["-m", "playwright", "install", "chromium"], {}, browserHost) !== 0) {
     info("Chromium 安装失败；若本机已有 Chrome/Brave，可设 CHROMIUM_CHANNEL=chrome 后继续");
   }
 
