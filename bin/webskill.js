@@ -118,6 +118,62 @@ function ensure() {
   }
 }
 
+function agentSkillDirs() {
+  const home = os.homedir();
+  const candidates = [
+    process.env.WEBSKILL_AGENT_DIR,
+    // 豆包 Doubao（macOS）
+    path.join(home, "Library", "Application Support", "Doubao", "Default", ".doubao",
+      "agent_mode", "workspace", ".skills"),
+    path.join(home, "Library", "Application Support", "Doubao", "Default", ".doubao",
+      "agent_mode", "workspace", ".user_skills"),
+    // 豆包 Doubao（Windows）
+    path.join(home, "AppData", "Roaming", "Doubao", "Default", ".doubao",
+      "agent_mode", "workspace", ".skills"),
+    // Claude Code / Codex / 通用约定
+    path.join(home, ".claude", "skills"),
+    path.join(home, ".codex", "skills"),
+    path.join(home, ".agents", "skills"),
+  ].filter(Boolean);
+  return [...new Set(candidates)];
+}
+
+/** 把 skill/web-auto 复制到各 Agent 的 skills 目录，使其可用 /web-auto 触发 */
+function installAgent(rest) {
+  const targets = rest.filter((a) => !a.startsWith("-"));
+  const source = path.join(ROOT, "skill", "web-auto");
+  if (!fs.existsSync(path.join(source, "SKILL.md"))) {
+    info(`缺少 ${source}/SKILL.md，无法安装`);
+    return 1;
+  }
+
+  if (rest.includes("--list")) {
+    for (const dir of agentSkillDirs())
+      console.log(`${fs.existsSync(dir) ? "found" : "  -  "}  ${dir}`);
+    return 0;
+  }
+
+  const resolved = targets.length
+    ? targets.map((dir) => path.resolve(dir))
+    : agentSkillDirs().filter((dir) => fs.existsSync(dir));
+
+  if (!resolved.length) {
+    info("未探测到已安装的 Agent。请显式指定目录，例如：");
+    info("  npx -y github:jinshan3690/dsh-web-auto-skill install-agent ~/.claude/skills");
+    return 1;
+  }
+
+  for (const skillsDir of resolved) {
+    const dest = path.join(skillsDir, "web-auto");
+    fs.mkdirSync(skillsDir, { recursive: true });
+    fs.rmSync(dest, { recursive: true, force: true });
+    fs.cpSync(source, dest, { recursive: true });
+    console.log(`web-auto -> ${dest}`);
+  }
+  console.log("在 Agent 中用 /web-auto 触发，或直接说「帮我在这个网页上填表」。");
+  return 0;
+}
+
 function main() {
   const args = process.argv.slice(2);
 
@@ -128,6 +184,10 @@ function main() {
   if (args[0] === "setup") {
     setup({ force: args.includes("--force") });
     return 0;
+  }
+  if (args[0] === "install-agent") {
+    // 运行时不依赖 Python，直接复制 SKILL.md
+    return installAgent(args.slice(1));
   }
 
   ensure();
