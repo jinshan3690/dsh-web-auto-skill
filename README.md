@@ -34,15 +34,21 @@ npx skills add jinshan3690/dsh-web-auto-skill
 
 交互式选择装到哪些 Agent（Claude Code、Codex、Cursor、豆包等），装完即可 `/web-auto` 触发。
 
+> `skills add` 是把 `skills/web-auto/` 整个目录复制成快照，仓库更新后要重跑一次才会拿到新的
+> `SKILL.md` 与 `scripts/`（旧版本装出来的 `scripts/` 是空的，`/web-auto` 会直接报找不到安装脚本）。
+
 **它会装什么**：只把 `skills/web-auto/`（`SKILL.md` + `scripts/`）复制进 Agent 的 skills 目录，
-**不会安装 Python 引擎，也不会生成 `webskill` 命令**。引擎由 skill 在首次运行时自己装：
+**不会安装 Python 引擎，也不会生成 `web-auto-skill` 命令**。引擎由 skill 在首次运行时自己装：
 
 ```bash
 bash <skill目录>/scripts/install-engine.sh    # SKILL.md 第 0 步会自动调用
 ```
 
-脚本做三件事：建 `~/.webskill/.venv`、`pip install` 本仓库、下载 Chromium（约 130MB）。
-只需一次，之后所有命令都走这个 venv。要换目录就设 `WEBSKILL_HOME`。
+脚本做四件事：建 `~/.webskill/.venv`、`pip install` 本仓库、下载 Chromium（约 130MB）、
+把 `web-auto-skill` 软链到一个已在 PATH 里的可写目录（`~/.local/bin`、`/opt/homebrew/bin`
+或 `/usr/local/bin`）。只需一次，之后所有命令都走这个 venv。要换目录就设 `WEBSKILL_HOME`。
+
+> 命令名就是 `web-auto-skill`。不在 PATH 时直接用绝对路径 `~/.webskill/.venv/bin/web-auto-skill`。
 
 要求：Python ≥ 3.10；npx 方式另需 Node ≥ 18。
 
@@ -51,9 +57,9 @@ bash <skill目录>/scripts/install-engine.sh    # SKILL.md 第 0 步会自动调
 ```bash
 DEMO="file://$PWD/examples/demo_form.html"
 
-webskill run "填写申请人张三，事由上海客户回访，金额860" "$DEMO" --scene demo
-webskill run "填写申请人李四，事由北京出差，金额1200" "$DEMO" --scene demo   # 命中同一 Skill，不再规划
-webskill skill-list
+web-auto-skill run "填写申请人张三，事由上海客户回访，金额860" "$DEMO" --scene demo
+web-auto-skill run "填写申请人李四，事由北京出差，金额1200" "$DEMO" --scene demo   # 命中同一 Skill，不再规划
+web-auto-skill skill-list
 ```
 
 默认有头浏览器，用户可见每一步。
@@ -78,7 +84,7 @@ webskill skill-list
 ## HTTP API
 
 ```bash
-webskill web --port 8000
+web-auto-skill web --port 8000
 ```
 
 | 方法 | 路径 |

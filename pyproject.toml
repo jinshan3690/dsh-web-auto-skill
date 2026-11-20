@@ -1,6 +1,6 @@
 [project]
 name = "webskill"
-version = "0.2.1"
+version = "0.2.2"
 description = "WebSkill - 给 Agent 用的网页操作 Skill 引擎：跑一次、学一条、下次直接复用"
 readme = "README.md"
 license = "MIT"
@@ -34,7 +34,7 @@ Homepage = "https://github.com/jinshan3690/dsh-web-auto-skill"
 Issues = "https://github.com/jinshan3690/dsh-web-auto-skill/issues"
 
 [project.scripts]
-webskill = "webskill.cli:app"
+web-auto-skill = "webskill.cli:app"
 
 
 [build-system]

@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.2.2 (2026-11-20)
+
+### 修复
+- **命令名统一为 `web-auto-skill`**：此前安装脚本只打印 `export PATH=...` 让用户自己加，
+  装完敲 `webskill` 直接 `command not found`。现在安装脚本会把命令软链到一个已在 PATH
+  里的可写目录（`~/.local/bin` → `/opt/homebrew/bin` → `/usr/local/bin`），装完即可用
+- **`npx` 启动器同样补软链**：`engineReady()` 后顺手建链，重启终端也能直接调
+- **pip 超时与镜像回退**：pypi 在国内常出现 `ReadTimeoutError` 导致安装中断。
+  默认 `--timeout 60 --retries 3`，失败后自动换阿里云镜像重试一次；
+  也可用 `WEBSKILL_PIP_INDEX` 指定源
+- 安装脚本支持本地目录安装（`WEBSKILL_REPO=<本地仓库>`，走 `pip install -e`，便于离线/开发）
+- 发现早期版本遗留的 `~/.webskill/venv` 时给出提示，避免与新目录并存白占空间
+
 ## v0.2.1 (2026-11-20)
 
 全链路实测（安装 → 冷启动 → 学习 → 复用 → 改版 → 风险拦截 → HTTP 安全闸）后的修复版本。

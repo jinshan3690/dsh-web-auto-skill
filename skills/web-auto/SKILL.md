@@ -11,12 +11,12 @@ license: MIT
 
 ## 0. 定位引擎（每次会话先做一次，很便宜）
 
-这个 skill 只是一份说明书，真正的执行引擎是本机的一个 Python 命令 `webskill`。先找它：
+这个 skill 只是一份说明书，真正的执行引擎是本机的一个 Python 命令 `web-auto-skill`。先找它：
 
 ```bash
-WS=""
-command -v webskill >/dev/null 2>&1 && WS="$(command -v webskill)"
-[ -z "$WS" ] && [ -x "$HOME/.webskill/.venv/bin/webskill" ] && WS="$HOME/.webskill/.venv/bin/webskill"
+WS="$(command -v web-auto-skill 2>/dev/null || true)"
+[ -z "$WS" ] && [ -x "$HOME/.webskill/.venv/bin/web-auto-skill" ] \
+  && WS="$HOME/.webskill/.venv/bin/web-auto-skill"
 "$WS" health 2>/dev/null | head -20
 ```
 
@@ -31,7 +31,8 @@ bash scripts/install-engine.sh --upgrade  # 已安装但 health 报错，强制�
 ```
 
 脚本会建 `~/.webskill/.venv`、装 CLI 与 Chromium（约 1-2 分钟，只做一次），
-然后把可执行路径打印出来。装不上就把报错原样告诉用户，别自己改环境。
+并把 `web-auto-skill` 软链到 PATH 可见目录，然后把结果打印出来。
+装不上就把报错原样告诉用户，别自己改环境。
 
 ## 1. 选调用形态（按谁负责规划决定）
 

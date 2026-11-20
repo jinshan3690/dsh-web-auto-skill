@@ -165,7 +165,7 @@ planner / reflector 的 system prompt 明确禁止生成审批类动作。
 
 ONNX 通路为什么值得单独维护：PyTorch 在新版 Python 上经常没 wheel（3.14 就没有），
 而 onnxruntime 有全平台 wheel。模型文件（`model_int8.onnx` + `tokenizer.json`）由
-`python -m webskill embed-setup` 一次拉取，落在 `storage/models/bge-small-zh-v1.5/`，
+`web-auto-skill embed-setup` 一次拉取，落在 `storage/models/bge-small-zh-v1.5/`，
 不引入任何 npm/JS 生态。
 
 推理细节：WordPiece 分词 → `input_ids/attention_mask/token_type_ids` → `last_hidden_state`

@@ -1,6 +1,6 @@
 # HTTP API
 
-基础地址：`http://127.0.0.1:8000`（`python -m webskill web` 启动）
+基础地址：`http://127.0.0.1:8000`（`web-auto-skill web` 启动）
 交互式文档：`/docs`
 
 > 上层 Agent 只需要 `POST /task/run` 一个接口完成「执行任务 + 自动学习」。

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 "use strict";
 /**
- * webskill launcher — 让 `npx webskill` / `npx github:jinshan3690/dsh-web-auto-skill` 直接可用。
+ * web-auto-skill launcher — 让 `npx github:jinshan3690/dsh-web-auto-skill` 直接可用。
  *
  * 它只做三件事：找到可用的 Python（>=3.10）、准备一个隔离的 .venv、把命令转发给 `python -m webskill`。
  * 首次运行会安装依赖和 Chromium（几分钟），之后走缓存。用户数据默认落在 ~/.webskill。
@@ -33,7 +33,7 @@ const VENV_PY =
 // npx 安装的数据放用户目录（缓存可能被清理）；源码安装沿用项目内 storage
 const DEFAULT_STORAGE = IS_NPX_CACHE ? path.join(DATA_HOME, "storage") : path.join(ROOT, "storage");
 
-const info = (msg) => process.stderr.write(`[webskill] ${msg}\n`);
+const info = (msg) => process.stderr.write(`[web-auto-skill] ${msg}\n`);
 
 function supportsCmd(cmd) {
   const probe = spawnSync(
@@ -85,6 +85,47 @@ function engineReady() {
   return probe.status === 0;
 }
 
+// 把 venv/bin 里的命令软链到 PATH 可见目录，这样 `npx` 装完之后
+// 用户在终端直接敲 `web-auto-skill` 也能用（否则只有 npx 这一条路）。
+function linkCommands() {
+  if (process.env.WEBSKILL_SKIP_LINK === "1") return;
+  // 只在 npx 场景（venv 在 ~/.webskill）建全局软链；
+  // 本地开发用的是项目内 .venv，别把 /opt/homebrew/bin 指到项目目录
+  if (!IS_NPX_CACHE) return;
+  const binDir = path.join(VENV_DIR, process.platform === "win32" ? "Scripts" : "bin");
+  const names = ["web-auto-skill"].filter((n) =>
+    fs.existsSync(path.join(binDir, n + (process.platform === "win32" ? ".exe" : "")))
+  );
+  if (!names.length) return;
+
+  const pathDirs = (process.env.PATH || "").split(path.delimiter).filter(Boolean);
+  const target = [path.join(os.homedir(), ".local", "bin"), "/opt/homebrew/bin", "/usr/local/bin"]
+    .find((dir) => {
+      if (!pathDirs.includes(dir)) return false;
+      try {
+        fs.accessSync(dir, fs.constants.W_OK);
+        return true;
+      } catch {
+        return false;
+      }
+    });
+  // 没有可写且已在 PATH 的目录就不动 shell 配置，npx 方式照旧可用
+  if (!target) return;
+
+  for (const name of names) {
+    const src = path.join(binDir, name);
+    const link = path.join(target, name);
+    try {
+      const stat = fs.lstatSync(link, { throwIfNoEntry: false });
+      if (stat && stat.ino === fs.statSync(src).ino) continue;
+      if (stat) fs.unlinkSync(link);
+      fs.symlinkSync(src, link);
+    } catch {
+      // 权限不足等情况静默跳过，不打断主流程
+    }
+  }
+}
+
 function setup({ force = false } = {}) {
   fs.mkdirSync(DEFAULT_STORAGE, { recursive: true });
 
@@ -92,6 +133,7 @@ function setup({ force = false } = {}) {
     info("更新依赖…");
     run(VENV_PY, ["-m", "pip", "install", "-q", "--upgrade", "pip"]);
     run(VENV_PY, ["-m", "pip", "install", "-q", "-r", path.join(ROOT, "requirements.txt")]);
+    linkCommands();
     return;
   }
 
@@ -110,7 +152,7 @@ function setup({ force = false } = {}) {
     "-m", "pip", "install", "-q", "-r", path.join(ROOT, "requirements.txt"),
   ]);
   if (pipStatus !== 0) {
-    info("依赖安装失败，请检查网络后重试：npx webskill setup");
+    info("依赖安装失败，请检查网络后重试：npx -y github:jinshan3690/dsh-web-auto-skill setup");
     process.exit(pipStatus);
   }
 
@@ -122,11 +164,15 @@ function setup({ force = false } = {}) {
     info("Chromium 安装失败；若本机已有 Chrome/Brave，可设 CHROMIUM_CHANNEL=chrome 后继续");
   }
 
+  linkCommands();
   info(`完成。数据目录：${DEFAULT_STORAGE}`);
 }
 
 function ensure() {
-  if (engineReady()) return;
+  if (engineReady()) {
+    linkCommands();
+    return;
+  }
   info("首次运行，正在准备环境…");
   setup();
 }
