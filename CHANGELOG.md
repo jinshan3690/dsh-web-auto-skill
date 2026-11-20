@@ -25,5 +25,5 @@
 
 ### 已知限制
 - 本地规则规划器仅适用于结构清晰的表单页，复杂交互需模型或外部 steps
-- Playwright 单页 + 8 个基础动作，iframe 与 shadow DOM 暂不支持
+- Playwright 单页 + 7 个基础动作（goto/fill/click/read/wait/select/checkpoint），iframe 与 shadow DOM 暂不支持
 - `sentence-transformers` 在 Python 3.13+ 无 wheel，语义召回请走 ONNX 方案
