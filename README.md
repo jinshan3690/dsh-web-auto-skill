@@ -169,7 +169,7 @@ python examples/e2e_smoke.py    # 浏览器冒烟（打印每步风险判定）
 ```
 
 `bin/webskill.js` 是 `npx` 启动器（找 Python、准备 venv、转发给 `python -m webskill`），
-发布 npm 包时用它；本地开发直接 `python -m webskill` 即可。
+npm 包名 `web-auto-skill`；本地开发直接 `python -m webskill` 即可。
 
 ## License
 

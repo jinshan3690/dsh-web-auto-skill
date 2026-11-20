@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.2.5 (2026-11-20)
+
+### 变更
+- **npm 包名改为 `web-auto-skill`**：原来叫 `webskill`，与 bin 名不一致，npx 更新时
+  还会和 npm 上的同名包抢缓存目录（报 `ENOTEMPTY ... rename .../webskill`）。
+  Python 包名仍是 `webskill`（内部模块，不对外）
+
 ## v0.2.4 (2026-11-20)
 
 ### 变更
