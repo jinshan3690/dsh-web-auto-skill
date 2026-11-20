@@ -15,8 +15,12 @@ license: MIT
 
 ```bash
 WS="$(command -v web-auto-skill 2>/dev/null || true)"
-[ -z "$WS" ] && [ -x "$HOME/.webskill/.venv/bin/web-auto-skill" ] \
-  && WS="$HOME/.webskill/.venv/bin/web-auto-skill"
+if [ -z "$WS" ]; then
+  # 没进 PATH 时按绝对路径兜底；.venv 与 venv 都要试（早期版本用的是 venv）
+  for p in "$HOME/.webskill/.venv/bin/web-auto-skill" "$HOME/.webskill/venv/bin/web-auto-skill"; do
+    [ -x "$p" ] && { WS="$p"; break; }
+  done
+fi
 "$WS" health 2>/dev/null | head -20
 ```
 

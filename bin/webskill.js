@@ -19,13 +19,28 @@ const DATA_HOME = process.env.WEBSKILL_HOME || path.join(os.homedir(), ".webskil
 // 因此 npx 场景把 venv 放到数据目录，本地源码开发仍复用项目内 .venv。
 const IS_NPX_CACHE = /[\\/]_npx[\\/]/.test(ROOT);
 const LOCAL_VENV = path.join(ROOT, ".venv");
+
+// 数据目录下的 venv：优先沿用已存在的（早期版本叫 venv，现在叫 .venv），
+// 否则按 .venv 新建。不认旧目录会导致老用户白装第二份约 300MB 的依赖。
+function pickDataVenv() {
+  for (const name of [".venv", "venv"]) {
+    const dir = path.join(DATA_HOME, name);
+    const py =
+      process.platform === "win32"
+        ? path.join(dir, "Scripts", "python.exe")
+        : path.join(dir, "bin", "python");
+    if (fs.existsSync(py)) return dir;
+  }
+  return path.join(DATA_HOME, ".venv");
+}
+
 // npx 场景与 skills/install-engine.sh 共用同一个 venv（~/.webskill/.venv），
 // 否则两条入口会各装一份依赖（各约 300MB），还互相看不见。
 const VENV_DIR = IS_NPX_CACHE
-  ? path.join(DATA_HOME, ".venv")
+  ? pickDataVenv()
   : fs.existsSync(LOCAL_VENV)
     ? LOCAL_VENV
-    : path.join(DATA_HOME, ".venv");
+    : pickDataVenv();
 const VENV_PY =
   process.platform === "win32"
     ? path.join(VENV_DIR, "Scripts", "python.exe")
