@@ -10,6 +10,7 @@ const { spawnSync } = require("node:child_process");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
+const readline = require("node:readline");
 
 const ROOT = path.resolve(__dirname, "..");
 const DATA_HOME = process.env.WEBSKILL_HOME || path.join(os.homedir(), ".webskill");
@@ -118,54 +119,90 @@ function ensure() {
   }
 }
 
-function agentSkillDirs() {
+function detectAgents() {
   const home = os.homedir();
-  const candidates = [
-    process.env.WEBSKILL_AGENT_DIR,
-    // 豆包 Doubao（macOS）
-    path.join(home, "Library", "Application Support", "Doubao", "Default", ".doubao",
-      "agent_mode", "workspace", ".skills"),
-    path.join(home, "Library", "Application Support", "Doubao", "Default", ".doubao",
-      "agent_mode", "workspace", ".user_skills"),
-    // 豆包 Doubao（Windows）
-    path.join(home, "AppData", "Roaming", "Doubao", "Default", ".doubao",
-      "agent_mode", "workspace", ".skills"),
-    // Claude Code / Codex / 通用约定
-    path.join(home, ".claude", "skills"),
-    path.join(home, ".codex", "skills"),
-    path.join(home, ".agents", "skills"),
-  ].filter(Boolean);
-  return [...new Set(candidates)];
+  const known = [
+    {
+      name: "Doubao 豆包",
+      dir: path.join(home, "Library", "Application Support", "Doubao", "Default", ".doubao",
+        "agent_mode", "workspace", ".skills"),
+    },
+    {
+      name: "Doubao 豆包 (user)",
+      dir: path.join(home, "Library", "Application Support", "Doubao", "Default", ".doubao",
+        "agent_mode", "workspace", ".user_skills"),
+    },
+    {
+      name: "Doubao 豆包 (Windows)",
+      dir: path.join(home, "AppData", "Roaming", "Doubao", "Default", ".doubao",
+        "agent_mode", "workspace", ".skills"),
+    },
+    { name: "Claude Code", dir: path.join(home, ".claude", "skills") },
+    { name: "Codex", dir: path.join(home, ".codex", "skills") },
+    { name: "Agent Skills", dir: path.join(home, ".agents", "skills") },
+  ];
+  if (process.env.WEBSKILL_AGENT_DIR) {
+    return [{ name: "WEBSKILL_AGENT_DIR", dir: path.resolve(process.env.WEBSKILL_AGENT_DIR) }];
+  }
+  return known.map((a) => ({ ...a, found: fs.existsSync(a.dir) }));
 }
 
-/** 把 skill/web-auto 复制到各 Agent 的 skills 目录，使其可用 /web-auto 触发 */
-function installAgent(rest) {
-  const targets = rest.filter((a) => !a.startsWith("-"));
-  const source = path.join(ROOT, "skill", "web-auto");
+function askSelection(items) {
+  return new Promise((resolve) => {
+    // 非交互环境（CI、管道）不阻塞，直接全装
+    if (!process.stdin.isTTY) return resolve(items);
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    console.log("\n可安装到以下 Agent：");
+    items.forEach((item, i) => console.log(`  ${i + 1}) ${item.name}  ${item.dir}`));
+    rl.question("\n选择编号（空格或逗号分隔，回车 = 全部，0 = 取消）：", (answer) => {
+      rl.close();
+      const text = answer.trim();
+      if (!text) return resolve(items);
+      const picked = text
+        .split(/[\s,]+/)
+        .map((n) => Number.parseInt(n, 10) - 1)
+        .filter((i) => Number.isInteger(i) && i >= 0 && i < items.length);
+      resolve([...new Set(picked)].map((i) => items[i]));
+    });
+  });
+}
+
+/** 把 skills/web-auto 复制到 Agent 的 skills 目录，使其可用 /web-auto 触发 */
+async function installAgent(rest) {
+  const source = path.join(ROOT, "skills", "web-auto");
   if (!fs.existsSync(path.join(source, "SKILL.md"))) {
     info(`缺少 ${source}/SKILL.md，无法安装`);
     return 1;
   }
 
+  const agents = detectAgents();
   if (rest.includes("--list")) {
-    for (const dir of agentSkillDirs())
-      console.log(`${fs.existsSync(dir) ? "found" : "  -  "}  ${dir}`);
+    for (const a of agents) console.log(`${a.found ? "found" : "  -  "}  ${a.name}  ${a.dir}`);
     return 0;
   }
 
-  const resolved = targets.length
-    ? targets.map((dir) => path.resolve(dir))
-    : agentSkillDirs().filter((dir) => fs.existsSync(dir));
+  const explicit = rest.filter((a) => !a.startsWith("-")).map((d) => path.resolve(d));
+  let targets = explicit.length
+    ? explicit.map((dir) => ({ name: "指定目录", dir }))
+    : agents.filter((a) => a.found);
 
-  if (!resolved.length) {
+  if (!targets.length) {
     info("未探测到已安装的 Agent。请显式指定目录，例如：");
     info("  npx -y github:jinshan3690/dsh-web-auto-skill install-agent ~/.claude/skills");
     return 1;
   }
 
-  for (const skillsDir of resolved) {
-    const dest = path.join(skillsDir, "web-auto");
-    fs.mkdirSync(skillsDir, { recursive: true });
+  if (!explicit.length && targets.length > 1) {
+    targets = await askSelection(targets);
+  }
+  if (!targets.length) {
+    info("已取消");
+    return 0;
+  }
+
+  for (const { dir } of targets) {
+    const dest = path.join(dir, "web-auto");
+    fs.mkdirSync(dir, { recursive: true });
     fs.rmSync(dest, { recursive: true, force: true });
     fs.cpSync(source, dest, { recursive: true });
     console.log(`web-auto -> ${dest}`);
@@ -174,7 +211,7 @@ function installAgent(rest) {
   return 0;
 }
 
-function main() {
+async function main() {
   const args = process.argv.slice(2);
 
   if (args[0] === "--version" || args[0] === "-v") {
@@ -186,7 +223,7 @@ function main() {
     return 0;
   }
   if (args[0] === "install-agent") {
-    // 运行时不依赖 Python，直接复制 SKILL.md
+    // 不需要 Python，只复制 SKILL.md
     return installAgent(args.slice(1));
   }
 
@@ -197,4 +234,9 @@ function main() {
   });
 }
 
-process.exit(main());
+main()
+  .then((code) => process.exit(code))
+  .catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });

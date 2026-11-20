@@ -10,13 +10,13 @@
     "src",
     "examples",
     "docs",
-    "skill",
     "pyproject.toml",
     "requirements.txt",
     ".env.example",
     "README.md",
     "CHANGELOG.md",
-    "LICENSE"
+    "LICENSE",
+    "skills"
   ],
   "engines": {
     "node": ">=18"

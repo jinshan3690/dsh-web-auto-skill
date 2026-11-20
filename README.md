@@ -29,19 +29,33 @@ WebSkill 是上层 Agent 的执行后端，不负责理解意图：Agent 决定�
 
 要求 Python ≥ 3.10；npx 方式另需 Node ≥ 18。
 
-### npx（不克隆仓库）
+### 1. 装进 Agent（交互选目标）
 
 ```bash
-npx -y github:jinshan3690/dsh-web-auto-skill setup          # 建 venv、装依赖与 Chromium，首次约 1–3 分钟
-npx -y github:jinshan3690/dsh-web-auto-skill install-agent  # 装成本机 Agent 的 skill，可用 /web-auto 触发
-npx -y github:jinshan3690/dsh-web-auto-skill health
+npx skills add jinshan3690/dsh-web-auto-skill
 ```
 
-`install-agent` 会探测本机已知的 Agent skills 目录并逐台安装；`--list` 只查看探测结果，也可传目录只装一处：
+安装器会列出仓库里的 skill 和本机检测到的 Agent，由你选择装到哪些（Claude Code、Codex、Cursor、豆包等），装完即可 `/web-auto` 触发。
+
+非交互场景：
 
 ```bash
-npx -y github:jinshan3690/dsh-web-auto-skill install-agent --list
-npx -y github:jinshan3690/dsh-web-auto-skill install-agent ~/.claude/skills
+npx skills add jinshan3690/dsh-web-auto-skill --all              # 所有 skill + 所有 Agent
+npx skills add jinshan3690/dsh-web-auto-skill -s web-auto        # 只装这个 skill
+npx skills add jinshan3690/dsh-web-auto-skill -l                 # 只列出仓库内 skill
+```
+
+不依赖 `skills` CLI 时，可用本仓库自带入口（同样会列出目标让你选）：
+
+```bash
+npx -y github:jinshan3690/dsh-web-auto-skill install-agent
+```
+
+### 2. 准备运行时
+
+```bash
+npx -y github:jinshan3690/dsh-web-auto-skill setup   # 建 venv、装依赖与 Chromium，首次约 1–3 分钟
+npx -y github:jinshan3690/dsh-web-auto-skill health
 ```
 
 数据写入 `~/.webskill`（`WEBSKILL_HOME` 可覆盖）。未发布到 npm registry，故使用 `github:` 前缀；发布后可简写为 `npx webskill`。
