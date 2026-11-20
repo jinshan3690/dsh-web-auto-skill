@@ -60,6 +60,8 @@ web-auto-skill skill-list
 ```
 
 > 命令不在 PATH 时用绝对路径 `~/.webskill/.venv/bin/web-auto-skill`（早期版本是 `~/.webskill/venv/bin/`）。
+> 第二步若报 `ENOTEMPTY: directory not empty, rename …/webskill`，是 npx 缓存残留：
+> `rm -rf ~/.npm/_npx` 后重跑即可。
 
 要求：Python ≥ 3.10（引擎是 Python 写的，npx 只是安装入口），Node ≥ 18。
 
