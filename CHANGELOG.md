@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.2.3 (2026-11-20)
+
+### 变更
+- **安装拆成两步明确的命令**：`npx skills add` 只复制说明书，装不出命令，一步做不到，
+  于是把引擎安装独立成第二条 CLI：
+  `npx -y github:jinshan3690/dsh-web-auto-skill setup`。已装过时秒回，只补软链
+
+### 修复
+- **`setup` 把包装进 npx 缓存**：原来跑 `pip install -r requirements.txt`（内含 `-e .`），
+  会在 `~/.npm/_npx` 里做 editable 安装，缓存一清入口就失效。改为按 `.[onnx]` 常规安装
+- **`engineReady()` 探测恒为真**：探测时带了 `PYTHONPATH=ROOT`，npx 缓存里的源码也能 import，
+  于是「没装」被误判成「已装」，后续步骤跳过
+- `SKILL.md` 与 npx 启动器兼容早期 `~/.webskill/venv` 目录，不再重复安装约 300MB 依赖
+
 ## v0.2.2 (2026-11-20)
 
 ### 修复

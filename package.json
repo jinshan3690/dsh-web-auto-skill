@@ -1,6 +1,6 @@
 {
   "name": "webskill",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Web operation skill engine: drive a real browser, then replay parameterized skills without calling a model.",
   "bin": {
     "web-auto-skill": "bin/webskill.js"

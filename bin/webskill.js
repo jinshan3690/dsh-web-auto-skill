@@ -91,12 +91,10 @@ function venvReady() {
 
 // venv 存在不等于装好了 —— install-engine.sh 也会往同一个 venv 里装东西。
 // 这里探一下能不能 import，避免两条入口各装一遍。
+// 不带 PYTHONPATH：否则 npx 缓存目录里的源码也能 import 成功，探测就永远为真。
 function engineReady() {
   if (!venvReady()) return false;
-  const probe = spawnSync(VENV_PY, ["-c", "import webskill.cli"], {
-    stdio: "ignore",
-    env: { ...process.env, PYTHONPATH: ROOT },
-  });
+  const probe = spawnSync(VENV_PY, ["-c", "import webskill.cli"], { stdio: "ignore" });
   return probe.status === 0;
 }
 
@@ -141,14 +139,30 @@ function linkCommands() {
   }
 }
 
+// venv 里是否有可执行入口（pip 装包时生成）
+function installedCommand() {
+  const binDir = path.join(VENV_DIR, process.platform === "win32" ? "Scripts" : "bin");
+  const name = "web-auto-skill" + (process.platform === "win32" ? ".exe" : "");
+  return fs.existsSync(path.join(binDir, name));
+}
+
+// 安装 Python 包本身。
+// npx 场景必须非 editable：~/.npm/_npx 缓存随时会被清，-e 装出来的入口会指向一个消失的路径。
+function installEnginePackage() {
+  const args = ["-m", "pip", "install", "-q", "--timeout", "60", "--retries", "3"];
+  if (!IS_NPX_CACHE) args.push("-e");
+  args.push(".[onnx]");
+  // cwd 设为 ROOT、用相对 "."：路径含空格或中文时 pip 的解析不会断
+  return run(VENV_PY, args, {}, ROOT) === 0;
+}
+
 function setup({ force = false } = {}) {
   fs.mkdirSync(DEFAULT_STORAGE, { recursive: true });
 
-  if (force && fs.existsSync(VENV_DIR) && venvReady()) {
-    info("更新依赖…");
-    run(VENV_PY, ["-m", "pip", "install", "-q", "--upgrade", "pip"]);
-    run(VENV_PY, ["-m", "pip", "install", "-q", "-r", path.join(ROOT, "requirements.txt")]);
+  // 已经装好就只补软链，几秒内结束。重装依赖要显式 --force。
+  if (!force && engineReady() && installedCommand()) {
     linkCommands();
+    info("引擎已就绪，无需安装（重装依赖加 --force）");
     return;
   }
 
@@ -161,14 +175,14 @@ function setup({ force = false } = {}) {
     }
   }
 
+  run(VENV_PY, ["-m", "pip", "install", "-q", "--upgrade", "pip", "--timeout", "30"]);
+
   info("安装 Python 依赖（首次约 1-3 分钟）…");
-  run(VENV_PY, ["-m", "pip", "install", "-q", "--upgrade", "pip"]);
-  const pipStatus = run(VENV_PY, [
-    "-m", "pip", "install", "-q", "-r", path.join(ROOT, "requirements.txt"),
-  ]);
-  if (pipStatus !== 0) {
-    info("依赖安装失败，请检查网络后重试：npx -y github:jinshan3690/dsh-web-auto-skill setup");
-    process.exit(pipStatus);
+  if (!installEnginePackage()) {
+    info("依赖安装失败。可换国内镜像重试，或用本地仓库的安装脚本：");
+    info("  WEBSKILL_PIP_INDEX=https://mirrors.aliyun.com/pypi/simple/ \\");
+    info("    bash <skill目录>/scripts/install-engine.sh");
+    process.exit(1);
   }
 
   info("安装 Chromium（playwright，约 130MB）…");
@@ -180,7 +194,15 @@ function setup({ force = false } = {}) {
   }
 
   linkCommands();
+  if (!engineReady()) {
+    info("安装完成但 import 失败，请把上面的报错发给开发者");
+    process.exit(1);
+  }
   info(`完成。数据目录：${DEFAULT_STORAGE}`);
+  if (installedCommand()) {
+    const binDir = path.join(VENV_DIR, process.platform === "win32" ? "Scripts" : "bin");
+    info(`命令：${path.join(binDir, "web-auto-skill")}`);
+  }
 }
 
 function ensure() {

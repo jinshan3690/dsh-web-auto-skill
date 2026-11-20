@@ -27,15 +27,25 @@ fi
 只要 `health` 有输出就说明可用，后面所有命令都用 `"$WS" <cmd>`。
 
 `health` 没输出 / `$WS` 为空 → 引擎还没装，或装了但版本比本文件旧（`health` 报 unknown command）。
-跑一次安装脚本（本文件同目录下的 `scripts/`）：
+安装拆成两步，各是一条命令，让用户在自己终端跑：
 
 ```bash
-bash scripts/install-engine.sh            # 未安装
-bash scripts/install-engine.sh --upgrade  # 已安装但 health 报错，强制更新到最新
+# 1. 装 skill 说明书（已经能触发本 skill 就跳过）
+npx skills add jinshan3690/dsh-web-auto-skill
+
+# 2. 装执行引擎（Python 包 + Chromium + web-auto-skill 命令）
+npx -y github:jinshan3690/dsh-web-auto-skill setup
 ```
 
-脚本会建 `~/.webskill/.venv`、装 CLI 与 Chromium（约 1-2 分钟，只做一次），
-并把 `web-auto-skill` 软链到 PATH 可见目录，然后把结果打印出来。
+第 2 步在已安装时会秒回、只补软链；要重装依赖加 `--force`。
+拉不动 GitHub 或 pypi 时，改跑本 skill 自带的脚本（等价，走同一个 venv）：
+
+```bash
+bash scripts/install-engine.sh
+```
+
+装完再跑一次上面的探测。仍然找不到就用绝对路径
+`~/.webskill/.venv/bin/web-auto-skill`（早期版本是 `~/.webskill/venv/bin/`）。
 装不上就把报错原样告诉用户，别自己改环境。
 
 ## 1. 选调用形态（按谁负责规划决定）
