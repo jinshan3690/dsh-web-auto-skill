@@ -44,9 +44,11 @@ def _parse_params(params_json: str | None) -> dict | None:
 
 def _print_result(result: dict):
     ok = result.get("success")
+    browser = result.get("browser_source") or ""
     console.print(
         f"trace_id={result.get('trace_id')}  success={ok}  "
-        f"plan_source={result.get('plan_source')}  {result.get('duration_ms', 0)}ms"
+        f"plan_source={result.get('plan_source')}{'  browser=' + browser if browser else ''}"
+        f"  {result.get('duration_ms', 0)}ms"
     )
     if result.get("learned_skill"):
         console.print(f"[green]已学习: {result['learned_skill']}  ({result.get('learn_reason')})[/green]")
@@ -54,6 +56,55 @@ def _print_result(result: dict):
         console.print(f"[dim]学习决策: {result['learn_reason']}[/dim]")
     if result.get("error"):
         console.print(f"[red]错误: {result['error']}[/red]")
+
+
+@app.command("browser")
+def cmd_browser(
+    port: int = typer.Option(9222, "--port", help="调试端口"),
+    profile: str = typer.Option(None, "--profile", help="专用数据目录（登录态存在这里）"),
+    status: bool = typer.Option(False, "--status", help="只看状态，不拉起窗口"),
+    stop: bool = typer.Option(False, "--stop", help="关掉引擎自动拉起的那个窗口"),
+):
+    """查看 / 准备可接管的浏览器（平时不用手动执行）
+
+    跑任务时引擎自己会保证有这么个窗口：有可接管的就复用，没有就自动拉起。
+    只有两种情况需要这个命令：
+    - 想提前登录一次：`browser` 打开窗口，登完以后所有任务复用这份登录态
+    - 想省内存：`browser --stop` 关掉常驻窗口（登录态还在 profile 里，下次自动恢复）
+    """
+    from web_auto_skill.browser import cdp as cdp_tool
+
+    if stop:
+        closed = cdp_tool.stop(f"http://127.0.0.1:{port}") or cdp_tool.stop()
+        if closed:
+            console.print("[green]已关闭引擎拉起的浏览器窗口[/green]")
+        else:
+            console.print("[yellow]没有找到引擎拉起的窗口[/yellow]"
+                          "（手动用 --remote-debugging-port 开的浏览器不归这个命令管）")
+        raise typer.Exit(0)
+
+    url = f"http://127.0.0.1:{port}"
+    alive = cdp_tool.is_alive(url)
+    if status:
+        console.print(f"{url}  {'[green]可接管[/green]' if alive else '[yellow]无响应[/yellow]'}")
+        state = cdp_tool.state()
+        if state.get("url"):
+            console.print(f"[dim]引擎记录: {state['url']}  pid={state.get('pid')}  "
+                          f"profile={state.get('profile')}[/dim]")
+        raise typer.Exit(0 if alive else 1)
+
+    if alive:
+        console.print(f"[green]已有可接管的浏览器：{url}[/green]")
+    else:
+        try:
+            cdp_tool.launch(port=port, profile=profile or "")
+        except RuntimeError as e:
+            console.print(f"[red]{e}[/red]")
+            raise typer.Exit(1) from e
+        console.print(f"[green]已打开浏览器：{url}[/green]")
+
+    console.print("在这个窗口登录一次，之后所有任务都会复用它的登录态（不必再加 --cdp）。"
+                  "想关掉常驻窗口：`browser --stop`")
 
 
 @app.command("init")
@@ -74,6 +125,14 @@ def cmd_run(
     learn: bool = typer.Option(True, "--learn/--no-learn", help="成功后是否自动学习"),
     plan_file: str = typer.Option(None, "--plan-file", help="外部规划 JSON 文件（不配置 LLM 时使用）"),
     params_json: str = typer.Option(None, "--params", help='参数字典，如 {"applicant":"张三"}'),
+    cdp: str = typer.Option(
+        None, "--cdp",
+        help="接管指定的浏览器（可只写端口 9222）。默认自动复用/拉起一个可接管的窗口",
+    ),
+    fresh: bool = typer.Option(
+        False, "--fresh",
+        help="不复用浏览器：每次现场拉临时浏览器、跑完就关（登录态不留）",
+    ),
 ):
     """执行一次网页任务"""
     ensure_dirs()
@@ -96,7 +155,8 @@ def cmd_run(
         return await run_task_detailed(
             command, page_key, role, scene_tag,
             headless=headless, confirm=_confirm, learn=learn,
-            plan_override=plan_override, params=params,
+            plan_override=plan_override, params=params, cdp_url=cdp,
+            auto_cdp=False if fresh else None,
         )
 
     result = asyncio.run(_inner())
@@ -112,6 +172,14 @@ def cmd_execute(
     headless: bool = typer.Option(False, "--headless"),
     learn: bool = typer.Option(True, "--learn/--no-learn"),
     params_json: str = typer.Option(None, "--params", help='参数字典，如 {"applicant":"张三"}'),
+    cdp: str = typer.Option(
+        None, "--cdp",
+        help="接管指定的浏览器（可只写端口 9222）。默认自动复用/拉起一个可接管的窗口",
+    ),
+    fresh: bool = typer.Option(
+        False, "--fresh",
+        help="不复用浏览器：每次现场拉临时浏览器、跑完就关（登录态不留）",
+    ),
 ):
     """纯执行：按外部给定的步骤运行，不需要 LLM"""
     ensure_dirs()
@@ -128,7 +196,8 @@ def cmd_execute(
         return await run_task_detailed(
             "执行外部计划", page_key, role, scene_tag,
             headless=headless, confirm=_confirm, learn=learn,
-            plan_override=plan, params=params,
+            plan_override=plan, params=params, cdp_url=cdp,
+            auto_cdp=False if fresh else None,
         )
 
     result = asyncio.run(_inner())
@@ -139,10 +208,20 @@ def cmd_execute(
 def cmd_contract(
     page_key: str = typer.Argument(..., help="目标页面 URL"),
     headless: bool = typer.Option(True, "--headless/--show"),
+    cdp: str = typer.Option(
+        None, "--cdp",
+        help="接管指定的浏览器（可只写端口 9222）。默认自动复用/拉起一个可接管的窗口",
+    ),
+    fresh: bool = typer.Option(
+        False, "--fresh", help="不复用浏览器，扫完就关",
+    ),
 ):
     """只扫描页面契约与指纹，供外部 Agent 自行规划"""
     ensure_dirs()
-    scanned = asyncio.run(inspect_contract(page_key, headless=headless))
+    scanned = asyncio.run(inspect_contract(
+        page_key, headless=headless, cdp_url=cdp,
+        auto_cdp=False if fresh else None,
+    ))
     console.print(f"fingerprint = {scanned['fingerprint']}")
     console.print_json(json.dumps(scanned["contract"], ensure_ascii=False))
 

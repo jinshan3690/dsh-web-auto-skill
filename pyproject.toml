@@ -1,6 +1,6 @@
 [project]
 name = "web-auto-skill"
-version = "0.3.0"
+version = "0.4.0"
 description = "Web Auto Skill - 给 Agent 用的网页操作 Skill 引擎：跑一次、学一条、下次直接复用"
 readme = "README.md"
 license = "MIT"

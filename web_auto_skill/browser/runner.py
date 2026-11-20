@@ -2,18 +2,25 @@
 import asyncio
 import traceback
 import uuid
+from contextlib import asynccontextmanager
 from typing import Awaitable, Callable
 
 from playwright.async_api import Page, async_playwright
 
 from web_auto_skill.audit.logger import audit_log
+from web_auto_skill.browser import cdp as cdp_tool
 from web_auto_skill.browser.branch_resolver import resolve_branch
+from web_auto_skill.browser.cdp import normalize_cdp_url
 from web_auto_skill.browser.contract_scanner import detect_human_gate, scan_contract
 from web_auto_skill.browser.interceptor import check_action
 from web_auto_skill.browser.risk_detector import detect_step_risk
 from web_auto_skill.config import (
     AUTO_LEARN,
+    BROWSER_CDP_AUTO,
+    BROWSER_CDP_PORT,
+    BROWSER_CDP_URL,
     BROWSER_HEADLESS,
+    BROWSER_PROFILE_DIR,
     CHROMIUM_CHANNEL,
     HUMAN_HINT,
     PAGE_LOAD_TIMEOUT,
@@ -238,8 +245,14 @@ def _humanize_browser_error(e: Exception) -> str:
 
     原始报错是一大段 Node 栈，调用方（尤其是 Agent）读不出「该装什么」。
     """
-    raw = f"{type(e).__name__}: {e}"
-    low = str(e).lower()
+    msg = str(e)
+    # 自己抛的业务错误已经是「错误码: 说明」的形状，别再套一层 `ValueError:`。
+    # 上层 Agent 是按前缀匹配错误码的，多一个前缀就匹配不上了。
+    head = msg.split(": ", 1)[0]
+    if len(head) >= 4 and head.isupper() and head.replace("_", "").isalpha():
+        return msg
+    raw = f"{type(e).__name__}: {msg}"
+    low = msg.lower()
     if "executable doesn't exist" in low or ("browsertype.launch" in low and "executable" in low):
         return ("BROWSER_MISSING: 未安装 Chromium，请先运行 "
                 "`python -m playwright install chromium`（或 bash scripts/install-engine.sh）")
@@ -249,6 +262,71 @@ def _humanize_browser_error(e: Exception) -> str:
     if "missing x server" in low or "no display" in low:
         return "NO_DISPLAY: 当前环境没有图形界面，请改用 headless=True"
     return raw
+
+
+@asynccontextmanager
+async def _browser_page(p, headless: bool, cdp_url: str | None = None,
+                        auto_cdp: bool | None = None):
+    """产出一个可操作的页面，并说明它是怎么来的。
+
+    browser_source 三种取值，收尾方式和提示文案都不同：
+
+    - `cdp`：接管一个已经在跑的浏览器（`--cdp` 显式指定，或自动探活找到的）。
+      登录态、扩展、代理全部沿用；收尾只关自己开的标签页，**绝不 close 浏览器**。
+    - `cdp-launched`：自动接管模式下**本次刚拉起来**的专用窗口。它是给人登录用的，
+      跑完必须留着 —— 关掉等于把用户刚登好的页面收走，下次还得重登。
+    - `launched`：老行为，现场拉起一个临时 Chromium，跑完整个关掉。
+
+    所以「关浏览器」只对 `launched` 生效；`cdp*` 一律不 close —— 那是用户的窗口。
+    """
+    cdp = normalize_cdp_url(cdp_url or BROWSER_CDP_URL)
+    auto = BROWSER_CDP_AUTO if auto_cdp is None else auto_cdp
+    launched_window = False
+
+    if not cdp and auto:
+        try:
+            # 探活 / 拉起都是同步阻塞（socket + subprocess），别卡事件循环
+            cdp, launched_window = await asyncio.to_thread(
+                cdp_tool.ensure_reusable,
+                BROWSER_CDP_PORT, BROWSER_PROFILE_DIR, headless,
+            )
+        except Exception as e:
+            # 自动接管失败不该把任务一起拖死：机器上没装 Chrome、服务器没图形界面
+            # 都很常见，退回自拉临时浏览器照样能跑完。
+            audit_log("cdp_auto_fail", "", f"自动接管失败，改用临时浏览器：{e}")
+            cdp = ""
+
+    if cdp:
+        try:
+            browser = await p.chromium.connect_over_cdp(cdp)
+        except Exception as e:
+            raise RuntimeError(
+                f"CDP_CONNECT_FAIL: 连不上 {cdp}（{e}）。"
+                "请用 `--remote-debugging-port=9222` 启动 Chrome 后再试，"
+                "或去掉 --cdp / BROWSER_CDP_URL 让引擎自己处理浏览器"
+            ) from e
+
+        # 复用默认上下文（= 用户平时那个浏览器配置，cookie 都在）；
+        # 没有上下文时（少见）才新建一个。
+        ctx = browser.contexts[0] if browser.contexts else await browser.new_context()
+        page = await ctx.new_page()
+        try:
+            yield page, ("cdp-launched" if launched_window else "cdp")
+        finally:
+            # 只关自己开的这个标签页；用户原来的标签页、窗口、登录态都不动
+            try:
+                await page.close()
+            except Exception:
+                pass
+        return
+
+    browser = await p.chromium.launch(headless=headless, channel=CHROMIUM_CHANNEL)
+    try:
+        ctx = await browser.new_context(viewport={"width": 1440, "height": 900})
+        page = await ctx.new_page()
+        yield page, "launched"
+    finally:
+        await browser.close()
 
 
 async def run_task(
@@ -261,12 +339,15 @@ async def run_task(
     learn: bool | None = None,
     plan_override: list[dict] | None = None,
     params: dict | None = None,
+    cdp_url: str | None = None,
+    auto_cdp: bool | None = None,
 ) -> tuple[str, bool]:
     """执行一次任务，返回 (trace_id, success)"""
     result = await run_task_detailed(
         user_cmd, page_key, role, scene_tag,
         headless=headless, confirm=confirm, learn=learn,
-        plan_override=plan_override, params=params,
+        plan_override=plan_override, params=params, cdp_url=cdp_url,
+        auto_cdp=auto_cdp,
     )
     return result["trace_id"], result["success"]
 
@@ -281,11 +362,20 @@ async def run_task_detailed(
     learn: bool | None = None,
     plan_override: list[dict] | None = None,
     params: dict | None = None,
+    cdp_url: str | None = None,
+    auto_cdp: bool | None = None,
 ) -> dict:
     """执行一次任务，返回结构化结果（给 HTTP 接口用）
 
     计划来源优先级：命中 Skill > 外部传入 plan_override > 内置 LLM 规划 > 本地规则规划
     都没有时抛 RuntimeError("NO_PLANNER")
+
+    cdp_url：接管指定的浏览器（如 http://127.0.0.1:9222）。只在 CLI 暴露，
+    HTTP 侧故意不提供请求级参数 —— 否则远程调用方就能驱动你本机已登录的浏览器。
+
+    auto_cdp：不给 cdp_url 时是否自动复用/拉起一个可接管的浏览器窗口
+    （默认读 BROWSER_CDP_AUTO）。HTTP 侧显式关掉：多任务共用一个浏览器实例
+    会串味（cookie、代理、并发写同一站点），不值得。
     """
     ensure_dirs()
     headless = BROWSER_HEADLESS if headless is None else headless
@@ -304,52 +394,57 @@ async def run_task_detailed(
     block_reason = ""
 
     async with async_playwright() as p:
-        browser = None
         try:
-            browser = await p.chromium.launch(headless=headless, channel=CHROMIUM_CHANNEL)
-            ctx = await browser.new_context(viewport={"width": 1440, "height": 900})
-            page = await ctx.new_page()
+            async with _browser_page(p, headless, cdp_url, auto_cdp) as (page, browser_source):
+                recorder.set_meta("browser_source", browser_source)
 
-            await page.goto(page_key, timeout=PAGE_LOAD_TIMEOUT)
-            try:
-                await page.wait_for_load_state("networkidle", timeout=8000)
-            except Exception:
-                pass
+                await page.goto(page_key, timeout=PAGE_LOAD_TIMEOUT)
+                try:
+                    await page.wait_for_load_state("networkidle", timeout=8000)
+                except Exception:
+                    pass
 
-            scanned = await scan_contract(page)
-            contract, fingerprint = scanned["contract"], scanned["fingerprint"]
-            controls = contract.get("controls", [])
-            recorder.set_meta("fingerprint", fingerprint)
+                scanned = await scan_contract(page)
+                contract, fingerprint = scanned["contract"], scanned["fingerprint"]
+                controls = contract.get("controls", [])
+                recorder.set_meta("fingerprint", fingerprint)
 
-            # ---------- 人工闸口：登录 / 验证码 ----------
-            # 不代客登录、不持久化会话。浏览器是有头的，用户自己操作，我们只负责说清楚。
-            gate = await detect_human_gate(page) if HUMAN_HINT else ""
-            if gate:
-                recorder.set_meta("human_gate", gate)
-                audit_log("human_gate", page_key, f"检测到需要人工介入：{gate}")
-                tip = (
-                    "页面要求登录，请在浏览器窗口中手动登录后重试"
-                    if gate == "login"
-                    else "页面出现验证码/人机验证，请在浏览器窗口中手动完成后重试"
+                # ---------- 人工闸口：登录 / 验证码 ----------
+                # 不代客登录、不持久化会话。浏览器是有头的，用户自己操作，我们只负责说清楚。
+                gate = await detect_human_gate(page) if HUMAN_HINT else ""
+                if gate:
+                    recorder.set_meta("human_gate", gate)
+                    audit_log("human_gate", page_key, f"检测到需要人工介入：{gate}")
+                    tip = (
+                        "页面要求登录，请在浏览器窗口中手动登录后重试"
+                        if gate == "login"
+                        else "页面出现验证码/人机验证，请在浏览器窗口中手动完成后重试"
+                    )
+                    if browser_source == "cdp-launched":
+                        tip += ("（窗口是刚为你打开的，就留在那儿了：登录一次，"
+                                "以后所有任务复用这份登录态）")
+                    elif browser_source == "cdp":
+                        tip += "（当前接管的是已开着的浏览器窗口，登录一次后同窗口直接重试即可）"
+                    if headless:
+                        tip += "（当前是 headless，看不到窗口；登录场景请去掉 --headless）"
+                    raise ValueError(f"NEED_HUMAN: {tip}")
+
+                plan, skill = await _resolve_plan(
+                    user_cmd, page_key, role, scene_tag, fingerprint,
+                    contract, plan_override, params, recorder,
                 )
-                raise ValueError(f"NEED_HUMAN: {tip}（headless 模式下请改用有头浏览器）")
+                plan_source = recorder.meta.get("plan_source", "")
 
-            plan, skill = await _resolve_plan(
-                user_cmd, page_key, role, scene_tag, fingerprint,
-                contract, plan_override, params, recorder,
-            )
-            plan_source = recorder.meta.get("plan_source", "")
+                success, block_reason = await _run_plan(
+                    page, plan, skill, recorder, confirm, controls)
+                if not success and not error:
+                    error = block_reason
 
-            success, block_reason = await _run_plan(
-                page, plan, skill, recorder, confirm, controls)
-            if not success and not error:
-                error = block_reason
-
-            try:
-                screenshot_path = str(SCREENSHOT_DIR / f"{recorder.trace_id}.png")
-                await page.screenshot(path=screenshot_path, full_page=True)
-            except Exception:
-                screenshot_path = ""
+                try:
+                    screenshot_path = str(SCREENSHOT_DIR / f"{recorder.trace_id}.png")
+                    await page.screenshot(path=screenshot_path, full_page=True)
+                except Exception:
+                    screenshot_path = ""
 
         except Exception as e:
             error = _humanize_browser_error(e)
@@ -360,9 +455,6 @@ async def run_task_detailed(
                 "traceback": traceback.format_exc()[-500:],
             })
             success = False
-        finally:
-            if browser is not None:
-                await browser.close()
 
     # 落库失败不该把「任务本身跑成功了」也一起丢掉
     try:
@@ -391,6 +483,7 @@ async def run_task_detailed(
         "error": error,
         "screenshot": screenshot_path,
         "llm_available": llm_available(),
+        "browser_source": recorder.meta.get("browser_source", ""),
         "duration_ms": recorder.elapsed_ms(),
     }
 
@@ -500,22 +593,20 @@ def _check_fingerprint_drift(
                   f"old={old.get('contract_fingerprint')} new={fingerprint}，连续两次不一致，旧 Skill 弃用")
 
 
-async def inspect_contract(page_key: str, headless: bool = True) -> dict:
+async def inspect_contract(
+    page_key: str, headless: bool = True, cdp_url: str | None = None,
+    auto_cdp: bool | None = None,
+) -> dict:
     """只扫描页面契约与指纹，不执行任何动作（给上层 Agent 自行规划用）"""
     ensure_dirs()
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=headless, channel=CHROMIUM_CHANNEL)
-        ctx = await browser.new_context(viewport={"width": 1440, "height": 900})
-        page = await ctx.new_page()
-        try:
+        async with _browser_page(p, headless, cdp_url, auto_cdp) as (page, _):
             await page.goto(page_key, timeout=PAGE_LOAD_TIMEOUT)
             try:
                 await page.wait_for_load_state("networkidle", timeout=8000)
             except Exception:
                 pass
             return await scan_contract(page)
-        finally:
-            await browser.close()
 
 
 def _build_skill_without_llm(

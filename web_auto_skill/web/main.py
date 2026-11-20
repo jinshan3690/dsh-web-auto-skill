@@ -18,7 +18,7 @@ from pydantic import BaseModel
 
 from web_auto_skill.audit.logger import audit_log
 from web_auto_skill.browser.runner import inspect_contract, run_task_detailed
-from web_auto_skill.config import API_TOKEN, MAX_CONCURRENT_TASKS
+from web_auto_skill.config import API_TOKEN, BROWSER_CDP_URL, MAX_CONCURRENT_TASKS
 from web_auto_skill.llm.provider import describe as llm_describe
 from web_auto_skill.sample.sample_store import (
     contribute_sample,
@@ -106,9 +106,11 @@ def api_health():
 
     info = llm_describe()
     info.pop("base_url", None)
+    # 接管用户浏览器时把这件事显式暴露出来：远程调用方能驱动的是「你那个已登录的浏览器」，
+    # 不该是只有自己知道的状态。
     return {"status": "ok", **info, "embed": backend_detail(),
-            "auth_enabled": bool(API_TOKEN)}
-
+            "auth_enabled": bool(API_TOKEN),
+            "browser": "cdp" if BROWSER_CDP_URL else "launch"}
 
 @api.post("/task/run")
 async def api_run(req: RunRequest):
@@ -124,6 +126,7 @@ async def api_run(req: RunRequest):
             req.command, page_key, req.role, req.scene_tag,
             headless=req.headless, learn=req.learn,
             plan_override=req.steps, params=req.params,
+            auto_cdp=False,  # 服务端不自动接管：并发任务共用一个浏览器会串味
         )
 
 
@@ -138,6 +141,7 @@ async def api_execute(req: ExecuteRequest):
             req.command or "执行外部计划", page_key, req.role, req.scene_tag,
             headless=req.headless, learn=req.learn,
             plan_override=req.steps, params=req.params,
+            auto_cdp=False,  # 同上
         )
 
 
@@ -146,7 +150,7 @@ async def api_contract(url: str, headless: bool = True):
     """只扫描页面契约与指纹，供上层 Agent 自行规划"""
     page_key = await _checked_url(url)
     async with app.state.task_sem:
-        scanned = await inspect_contract(page_key, headless=headless)
+        scanned = await inspect_contract(page_key, headless=headless, auto_cdp=False)
     return {
         "page_key": page_key,
         "fingerprint": scanned["fingerprint"],

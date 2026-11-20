@@ -78,13 +78,43 @@ web-auto-skill skill-list
 
 默认有头浏览器，用户可见每一步。
 
+## 复用已登录的浏览器（默认开启，不用手动准备）
+
+每次新开浏览器意味着「上一次的登录态没了」，遇到需要登录的后台就要反复人工登录。
+所以引擎默认会维持一个**可接管的浏览器窗口**，不需要你先跑什么命令：
+
+```bash
+# 第一次：自动弹出窗口，在这个窗口里登录一次
+web-auto-skill run "填写申请人张三，事由客户回访" "https://oa.example.com/form"
+
+# 之后：同一条命令，直接复用那份登录态
+web-auto-skill run "填写申请人李四，事由北京出差" "https://oa.example.com/form"
+```
+
+机制与边界：
+
+- 启动时先探活：端口上已有可接管的浏览器就复用（输出 `browser=cdp`），
+  没有就自动用专用 profile 拉起一个（输出 `browser=cdp-launched`）
+- 拉起和复用始终是**同一个窗口**；任务只新开一个标签页、跑完关这个标签页，
+  **不会关掉窗口**，也不动你原有的标签页 —— 否则你刚登好的页面就被收走了
+- 登录态存在专用数据目录（默认 `~/.web-auto-skill/chrome-profile`），登录一次长期有效；
+  必须是独立目录——Chrome 136 起禁止用默认 profile 开调试端口
+- 想提前登录一次，或关掉常驻窗口省内存：`web-auto-skill browser` / `web-auto-skill browser --stop`
+- 不想要这套：`--fresh` 只对当前命令生效（现场拉临时浏览器、跑完销毁）；
+  `BROWSER_CDP_AUTO=false` 全局关掉
+- 想接管**你自己开的**浏览器：`--cdp 9222`（或 `BROWSER_CDP_URL=http://127.0.0.1:9222`）
+- HTTP 侧**故意不开放**：接管/复用的是你本机已登录的浏览器，不能由远程调用方决定，
+  并发任务共用一个实例也会串味。服务端自己设了 `BROWSER_CDP_URL` 时，
+  `/health` 会显示 `"browser": "cdp"` 把它暴露出来
+
 ## CLI
 
 | 命令 | 说明 |
 |---|---|
-| `run <command> <url>` | `--scene` 场景、`--params '{...}'` 显式传参、`--headless`、`--no-learn`、`--plan-file` |
-| `execute <url> --plan-file <json>` | 按外部步骤执行，不涉及模型 |
-| `contract <url>` | 只返回契约与指纹 |
+| `run <command> <url>` | `--scene` 场景、`--params '{...}'` 显式传参、`--headless`、`--no-learn`、`--plan-file`、`--cdp`、`--fresh` |
+| `execute <url> --plan-file <json>` | 按外部步骤执行，不涉及模型（同样支持 `--cdp` / `--fresh`） |
+| `contract <url>` | 只返回契约与指纹（需要登录的页面默认就会复用登录态） |
+| `browser` | 提前打开可接管窗口并登录（`--port`、`--profile`）；`--status` 看状态、`--stop` 关掉常驻窗口 |
 | `skill-list` `skill-show` `skill-search` | 查看 / 检索 Skill |
 | `skill-rollback <id> <version>` `skill-remove <id>` | 回滚 / 删除整条家族 |
 | `trace-list` `trace-show` | 轨迹、耗时与截图 |
@@ -145,6 +175,10 @@ web-auto-skill web --port 8000
 | `EMBED_BACKEND` | `auto` | `auto` / `onnx` / `sbert` / `ngram` |
 | `BROWSER_HEADLESS` | `false` | 默认有头 |
 | `CHROMIUM_CHANNEL` | `chromium` | 用完整 Chromium，headless-shell 会导致 click 超时 |
+| `BROWSER_CDP_AUTO` | `true` | 自动复用/拉起可接管的浏览器窗口（免手动 `browser` 命令） |
+| `BROWSER_CDP_PORT` | `9222` | 调试端口起点，被占时自动往后顺延 |
+| `BROWSER_PROFILE_DIR` | `~/.web-auto-skill/chrome-profile` | 自动拉起窗口的登录态目录 |
+| `BROWSER_CDP_URL` | 空 | 接管指定的浏览器（如 `http://127.0.0.1:9222`）；设了就不再自动拉起 |
 | `MAX_SKILL_VERSIONS` `AUTO_LEARN` | `5` `true` | 版本上限 / 自动学习 |
 
 完整清单见 [`.env.example`](.env.example)。
@@ -154,7 +188,8 @@ web-auto-skill web --port 8000
 - 单页 + 七个动作，iframe 与 shadow DOM 暂不支持
 - 本地规则规划器只适配结构清晰的表单页
 - `sentence-transformers` 在 Python 3.13+ 无 wheel，语义召回走 ONNX
-- 每个任务新开一个浏览器上下文，并发靠信号量限制，未做浏览器池复用
+- 默认维护一个常驻的可接管浏览器窗口（登录态复用）；`--fresh` 或
+  `BROWSER_CDP_AUTO=false` 回到「每次临时拉一个、跑完销毁」
 
 ## 开发
 

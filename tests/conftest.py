@@ -6,11 +6,16 @@ config 在 import 时就把 STORAGE_ROOT / LLM 配置算成常量了。
 import os
 import tempfile
 
-os.environ.setdefault("STORAGE_ROOT", tempfile.mkdtemp(prefix="web_auto_skill-test-"))
+# 强制用临时目录（不是 setdefault）：测试绝不该读写真实的 ~/.web-auto-skill/storage。
+# 外部 shell 遗留的 STORAGE_ROOT 会让用例跑在脏库上，制造「单跑通过、全量失败」的假故障。
+os.environ["STORAGE_ROOT"] = tempfile.mkdtemp(prefix="web_auto_skill-test-")
 # 测试永远不碰真实模型，也不因为页面文案触发人工闸口
 os.environ["LLM_PROVIDER"] = "none"
 os.environ["HUMAN_HINT"] = "false"
 os.environ["BROWSER_HEADLESS"] = "true"
+# 默认用临时浏览器：自动接管会复用同一个窗口，用例之间会互相污染。
+# 专门测自动接管的用例自己传 auto_cdp=True。
+os.environ["BROWSER_CDP_AUTO"] = "false"
 # demo 页是 file://，执行层的导航白名单默认会拦（线上行为），测试里显式放开
 os.environ["ALLOW_FILE_URL"] = "true"
 

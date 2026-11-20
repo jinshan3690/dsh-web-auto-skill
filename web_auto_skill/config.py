@@ -42,6 +42,23 @@ HUMAN_HINT = os.getenv("HUMAN_HINT", "true").lower() == "true"
 # 浏览器
 BROWSER_HEADLESS = os.getenv("BROWSER_HEADLESS", "false").lower() == "true"
 
+# 接管用户已经开着的浏览器（CDP 调试端口），而不是每次新开一个。
+# 好处：复用浏览器里已有的登录态（内网 OA、需登录后台不用每次手动登录）；
+# 留空时走下面的 BROWSER_CDP_AUTO 自动接管。
+BROWSER_CDP_URL = os.getenv("BROWSER_CDP_URL", "").strip()
+
+# 自动接管：不用先手动 `web-auto-skill browser`。引擎启动时先探活，
+#   端口上有可接管的浏览器 -> 直接复用（登录态、扩展、代理都沿用）
+#   没有 -> 自动用专用 profile 拉起一个，之后一直复用
+# 登录态存在专用数据目录里，登录一次以后不用再登。
+# 设为 false = 老行为（每次任务现场拉一个临时浏览器，跑完就关，登录态不留）。
+BROWSER_CDP_AUTO = os.getenv("BROWSER_CDP_AUTO", "true").lower() == "true"
+BROWSER_CDP_PORT = int(os.getenv("BROWSER_CDP_PORT", "9222"))
+# Chrome 136+ 禁止用默认 profile 开调试端口，所以自动拉起时固定用这个独立目录
+BROWSER_PROFILE_DIR = os.getenv("BROWSER_PROFILE_DIR") or str(
+    Path.home() / ".web-auto-skill" / "chrome-profile"
+)
+
 
 def _detect_browser_channel() -> str:
     """默认复用系统已装的浏览器，新用户不用为跑一条命令再下载 130MB Chromium。
