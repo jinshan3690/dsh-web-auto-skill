@@ -18,6 +18,11 @@
 
 ### 修复
 - `NEED_HUMAN` 的「请改用有头浏览器」后缀改为只在 headless 时出现
+- **更新路径真的会更新**：`setup --force` 与 `install-engine.sh --upgrade` 此前只是跳过
+  「已安装」检查，后面的 `pip install` 遇到同版本仍判「已满足」——版本号没变时更新装不上新代码。
+  现在先 `--force-reinstall --no-deps` 覆盖本体，再普通安装一次补新增依赖
+- `web-auto-skill health` 输出新增 `version`：更新后可直接确认装的是哪一版
+  （editable 安装的元数据可能滞后，这个字段能暴露出来）
 
 ### 测试
 - `tests/test_browser.py` 新增自动接管用例：拉起一次、二次复用同一窗口、

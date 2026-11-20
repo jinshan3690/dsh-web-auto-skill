@@ -51,7 +51,7 @@ npx -y github:jinshan3690/dsh-web-auto-skill setup
 可写目录（`~/.local/bin` → `/opt/homebrew/bin` → `/usr/local/bin`）。
 
 检测到你机器上已有 Chrome / Edge / Brave 时**跳过 Chromium 下载**；已装过时秒回，只补软链。
-要重装依赖加 `--force`，换安装目录设 `WEB_AUTO_SKILL_HOME`。
+更新或重装依赖加 `--force`，换安装目录设 `WEB_AUTO_SKILL_HOME`。
 
 验证：
 
@@ -65,6 +65,30 @@ web-auto-skill skill-list
 > `rm -rf ~/.npm/_npx` 后重跑即可。
 
 要求：Python ≥ 3.10（引擎是 Python 写的，npx 只是安装入口），Node ≥ 18。
+
+## 更新
+
+装完之后更新，**不需要重装 Python 环境**，也不需要卸载。两部分各自更新：
+
+```bash
+# ① 说明书（SKILL.md + scripts）：重跑第一步，已存在时会问是否覆盖
+npx skills add jinshan3690/dsh-web-auto-skill
+
+# ② 引擎代码：加 --force，否则看到「引擎已就绪」直接返回、什么都不做
+npx -y github:jinshan3690/dsh-web-auto-skill setup --force
+```
+
+`--force` 会先强制覆盖包本体、再补一次依赖，所以「版本号没变、只是代码改了」也能更新到
+（这一步是必须的：不带 `--force` 时 pip 对同版本会判「已满足」，看起来成功但装的还是旧代码）。
+
+确认装的是哪一版：
+
+```bash
+web-auto-skill health        # 输出第一项 version
+```
+
+> 只更新引擎、不动说明书时，只跑 ② 即可。
+> 离线/内网：`WEB_AUTO_SKILL_REPO=<仓库目录> bash <skill目录>/scripts/install-engine.sh --upgrade`
 
 ## 快速开始
 

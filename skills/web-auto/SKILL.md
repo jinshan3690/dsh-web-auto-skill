@@ -40,6 +40,16 @@ npx -y github:jinshan3690/dsh-web-auto-skill setup
 `~/.web-auto-skill/.venv/bin/web-auto-skill`（早期版本是 `~/.web-auto-skill/venv/bin/`）。
 装不上就把报错原样告诉用户，别自己改环境。
 
+已经装过、但要用新版本时，让用户跑这两条（都在终端里跑，别代跑）：
+
+```bash
+npx skills add jinshan3690/dsh-web-auto-skill                    # 更新说明书
+npx -y github:jinshan3690/dsh-web-auto-skill setup --force        # 更新引擎
+```
+
+第二条**必须带 `--force`**：不带时脚本看到「引擎已就绪」会直接返回，等于没更新。
+装完 `"$WS" health` 的第一项 `version` 就是新版本号。
+
 ## 1. 选调用形态（按谁负责规划决定）
 
 | 形态 | 命令 | 何时用 |

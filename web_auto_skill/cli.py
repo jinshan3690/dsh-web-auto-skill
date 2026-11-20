@@ -28,6 +28,19 @@ app = typer.Typer(help="Web Auto Skill - 网页操作 Skill 引擎")
 console = Console()
 
 
+def _engine_version() -> str:
+    """已安装包的版本号；源码直跑（没装进环境）时返回 unknown
+
+    更新后用它确认装的是哪一版：`web-auto-skill health`。
+    """
+    try:
+        from importlib.metadata import version
+
+        return version("web-auto-skill")
+    except Exception:
+        return "unknown"
+
+
 def _parse_params(params_json: str | None) -> dict | None:
     if not params_json:
         return None
@@ -232,7 +245,8 @@ def cmd_health():
     from web_auto_skill.llm.embed import backend_detail
     from web_auto_skill.llm.provider import describe
 
-    info = describe()
+    info = {"version": _engine_version()}
+    info.update(describe())
     info["embed"] = backend_detail()
     console.print_json(json.dumps(info, ensure_ascii=False))
 

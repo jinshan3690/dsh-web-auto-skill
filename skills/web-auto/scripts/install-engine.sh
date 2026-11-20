@@ -127,14 +127,29 @@ pkg_install() {
   return 1
 }
 
+# --upgrade：只靠「已安装」判断会跳过更新，而 pip 对同版本的包也会说「已满足」，
+# 所以升级时必须 --force-reinstall 覆盖本体（--no-deps 避免把 playwright 等大依赖重装一遍），
+# 再普通装一次补上新版本新增的依赖。
 if [ -f "$REPO/pyproject.toml" ]; then
   # 本地目录：可编辑安装，改代码即生效（开发/离线场景）
   log "从本地目录安装: $REPO"
-  pkg_install -e "$REPO[onnx]" || fail "pip 安装失败，检查 $REPO 是否是有效的本仓库"
+  if [ "$UPGRADE" = "1" ]; then
+    pkg_install --force-reinstall --no-deps -e "$REPO[onnx]" \
+      || fail "pip 安装失败，检查 $REPO 是否是有效的本仓库"
+    pkg_install -e "$REPO[onnx]" || true
+  else
+    pkg_install -e "$REPO[onnx]" || fail "pip 安装失败，检查 $REPO 是否是有效的本仓库"
+  fi
 else
   log "安装 web_auto_skill（含 ONNX 语义召回，约 22MB 依赖）..."
-  pkg_install "web_auto_skill[onnx] @ git+$REPO" \
-    || fail "pip 安装失败。检查网络/代理后重试，或指定 WEB_AUTO_SKILL_REPO=<本地目录或镜像地址>"
+  if [ "$UPGRADE" = "1" ]; then
+    pkg_install --force-reinstall --no-deps "web_auto_skill[onnx] @ git+$REPO" \
+      || fail "pip 安装失败。检查网络/代理后重试，或指定 WEB_AUTO_SKILL_REPO=<本地目录或镜像地址>"
+    pkg_install "web_auto_skill[onnx] @ git+$REPO" || true
+  else
+    pkg_install "web_auto_skill[onnx] @ git+$REPO" \
+      || fail "pip 安装失败。检查网络/代理后重试，或指定 WEB_AUTO_SKILL_REPO=<本地目录或镜像地址>"
+  fi
 fi
 
 if [ "${WEB_AUTO_SKILL_SKIP_BROWSER:-0}" != "1" ]; then

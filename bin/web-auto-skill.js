@@ -147,14 +147,32 @@ function installedCommand() {
   return fs.existsSync(path.join(binDir, name));
 }
 
-// 安装 Python 包本身。
-// npx 场景必须非 editable：~/.npm/_npx 缓存随时会被清，-e 装出来的入口会指向一个消失的路径。
-function installEnginePackage() {
-  const args = ["-m", "pip", "install", "-q", "--timeout", "60", "--retries", "3"];
-  if (!IS_NPX_CACHE) args.push("-e");
-  args.push(".[onnx]");
-  // cwd 设为 ROOT、用相对 "."：路径含空格或中文时 pip 的解析不会断
-  return run(VENV_PY, args, {}, ROOT) === 0;
+// 安装 / 更新 Python 包本体。
+// npx 场景必须非 editable：~/.npm/_npx 缓存随时会被清，-e 装出来的入口会指向消失的路径。
+// force（更新场景）不能只靠版本号判断：pip 对同版本的 `.` 会认为「已满足」直接跳过，
+// 于是「代码改了但版本号没动」根本装不上。所以先 --force-reinstall --no-deps 覆盖本体
+// （只重装本体，不动 playwright/onnxruntime 这些大依赖），再普通装一次补新增依赖。
+function installEnginePackage({ force = false } = {}) {
+  const base = ["-m", "pip", "install", "-q", "--timeout", "60", "--retries", "3"];
+  const editable = !IS_NPX_CACHE;
+  // 用相对 "." 而不是绝对路径：路径含空格或中文时 pip 的解析更稳（cwd 已设为 ROOT）
+  const spec = ".[onnx]";
+
+  const plainInstall = () => {
+    const args = [...base];
+    if (editable) args.push("-e");
+    args.push(spec);
+    return run(VENV_PY, args, {}, ROOT) === 0;
+  };
+
+  if (!force) return plainInstall();
+
+  const hard = [...base, "--force-reinstall", "--no-deps"];
+  if (editable) hard.push("-e");
+  hard.push(spec);
+  // 强制覆盖失败也不必中断：退到普通安装，至少不会比更新前更差
+  run(VENV_PY, hard, {}, ROOT);
+  return plainInstall();
 }
 
 // 与 web_auto_skill/config.py 的 _detect_browser_channel 保持一致：
@@ -206,7 +224,7 @@ function setup({ force = false } = {}) {
   run(VENV_PY, ["-m", "pip", "install", "-q", "--upgrade", "pip", "--timeout", "30"]);
 
   info("安装 Python 依赖（首次约 1-3 分钟）…");
-  if (!installEnginePackage()) {
+  if (!installEnginePackage({ force })) {
     info("依赖安装失败。可换国内镜像重试，或用本地仓库的安装脚本：");
     info("  WEB_AUTO_SKILL_PIP_INDEX=https://mirrors.aliyun.com/pypi/simple/ \\");
     info("    bash <skill目录>/scripts/install-engine.sh");
