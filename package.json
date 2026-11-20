@@ -1,0 +1,42 @@
+{
+  "name": "webskill",
+  "version": "0.1.0",
+  "description": "Web operation skill engine: drive a real browser, then replay parameterized skills without calling a model.",
+  "bin": {
+    "webskill": "bin/webskill.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "examples",
+    "docs",
+    "skill",
+    "pyproject.toml",
+    "requirements.txt",
+    ".env.example",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "browser-automation",
+    "playwright",
+    "agent",
+    "skill",
+    "llm",
+    "web-automation"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jinshan3690/dsh-web-auto-skill.git"
+  },
+  "homepage": "https://github.com/jinshan3690/dsh-web-auto-skill",
+  "bugs": {
+    "url": "https://github.com/jinshan3690/dsh-web-auto-skill/issues"
+  },
+  "license": "MIT",
+  "author": "jinshan3690"
+}

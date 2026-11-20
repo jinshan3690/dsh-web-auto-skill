@@ -25,8 +25,8 @@ AUTO_LEARN = os.getenv("AUTO_LEARN", "true").lower() == "true"
 EMBED_MODEL = os.getenv("EMBED_MODEL", "BAAI/bge-small-zh-v1.5")
 # 向量后端：auto（优先本地 ONNX → sentence-transformers → n-gram）/ onnx / sbert / ngram
 EMBED_BACKEND = os.getenv("EMBED_BACKEND", "auto").lower()
-# 本地 ONNX 模型目录（由 `python -m src embed-setup` 下载）
-EMBED_ONNX_DIR = os.getenv("EMBED_ONNX_DIR", os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "storage", "models", "bge-small-zh-v1.5"))
+# 本地 ONNX 模型目录（由 `webskill embed-setup` 下载）
+EMBED_ONNX_DIR = os.getenv("EMBED_ONNX_DIR") or str(STORAGE_ROOT / "models" / "bge-small-zh-v1.5")
 EMBED_THREADS = int(os.getenv("EMBED_THREADS", "2"))
 # 检测到登录/验证码页面时，停下来提示用户手动完成（不代客登录、不保存会话）
 HUMAN_HINT = os.getenv("HUMAN_HINT", "true").lower() == "true"

@@ -25,3 +25,7 @@ storage/
 # 测试 / lint 缓存
 .pytest_cache/
 .ruff_cache/
+
+# node（npx launcher）
+node_modules/
+package-lock.json
