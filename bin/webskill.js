@@ -12,8 +12,17 @@ const os = require("node:os");
 const path = require("node:path");
 
 const ROOT = path.resolve(__dirname, "..");
-const VENV_DIR = path.join(ROOT, ".venv");
 const DATA_HOME = process.env.WEBSKILL_HOME || path.join(os.homedir(), ".webskill");
+// 通过 npx 从 GitHub 安装时，本仓库被 clone 进 ~/.npm/_npx/…；Playwright 的 CLI 用
+// argv 路径是否含 "_npx" 判断「在 npx 里跑」，会把正常安装误报成未装依赖。
+// 因此 npx 场景把 venv 放到数据目录，本地源码开发仍复用项目内 .venv。
+const IS_NPX_CACHE = /[\\/]_npx[\\/]/.test(ROOT);
+const LOCAL_VENV = path.join(ROOT, ".venv");
+const VENV_DIR = IS_NPX_CACHE
+  ? path.join(DATA_HOME, "venv")
+  : fs.existsSync(LOCAL_VENV)
+    ? LOCAL_VENV
+    : path.join(DATA_HOME, "venv");
 const VENV_PY =
   process.platform === "win32"
     ? path.join(VENV_DIR, "Scripts", "python.exe")
