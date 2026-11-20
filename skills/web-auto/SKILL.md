@@ -17,7 +17,7 @@ license: MIT
 WS="$(command -v web-auto-skill 2>/dev/null || true)"
 if [ -z "$WS" ]; then
   # 没进 PATH 时按绝对路径兜底；.venv 与 venv 都要试（早期版本用的是 venv）
-  for p in "$HOME/.webskill/.venv/bin/web-auto-skill" "$HOME/.webskill/venv/bin/web-auto-skill"; do
+  for p in "$HOME/.web-auto-skill/.venv/bin/web-auto-skill" "$HOME/.web-auto-skill/venv/bin/web-auto-skill"; do
     [ -x "$p" ] && { WS="$p"; break; }
   done
 fi
@@ -37,7 +37,7 @@ npx -y github:jinshan3690/dsh-web-auto-skill setup
 检测到系统 Chrome / Edge / Brave 会跳过浏览器下载。
 
 装完再跑一次上面的探测。仍然找不到就用绝对路径
-`~/.webskill/.venv/bin/web-auto-skill`（早期版本是 `~/.webskill/venv/bin/`）。
+`~/.web-auto-skill/.venv/bin/web-auto-skill`（早期版本是 `~/.web-auto-skill/venv/bin/`）。
 装不上就把报错原样告诉用户，别自己改环境。
 
 ## 1. 选调用形态（按谁负责规划决定）
@@ -125,7 +125,7 @@ curl -s -X POST localhost:8000/task/run -H 'Content-Type: application/json' \
   -d '{"command":"填写报销单","page_key":"https://example.com/form","scene_tag":"expense","learn":true}'
 ```
 
-暴露到本机以外时**必须**设置 `WEBSKILL_API_TOKEN`（请求带 `Authorization: Bearer <token>`），
+暴露到本机以外时**必须**设置 `WEB_AUTO_SKILL_API_TOKEN`（请求带 `Authorization: Bearer <token>`），
 否则等于把本机浏览器和内网访问能力开放出去。访问内网 OA 需要 `ALLOW_PRIVATE_NETWORK=true`。
 
 路由与字段见项目 `docs/api.md`；`/task/run` 返回 `success / plan_source / trace_id / learned_skill / error / duration_ms`。

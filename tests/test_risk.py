@@ -3,8 +3,8 @@
 核心回归：外部传入的 steps 可能没有 desc（SKILL.md 的 B 形态示例就没有），
 那种情况下审批按钮曾经会被判成 low 直接点掉。这里把那条路径钉死。
 """
-from webskill.browser.interceptor import check_action
-from webskill.browser.risk_detector import detect_risk, detect_step_risk, labels_for_target
+from web_auto_skill.browser.interceptor import check_action
+from web_auto_skill.browser.risk_detector import detect_risk, detect_step_risk, labels_for_target
 
 
 class TestDescOnly:

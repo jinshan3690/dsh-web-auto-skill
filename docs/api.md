@@ -11,7 +11,7 @@
 
 | 限制 | 默认 | 说明 |
 |---|---|---|
-| `Authorization: Bearer <token>` | 不启用 | 设置 `WEBSKILL_API_TOKEN` 后，除 `/health` 外所有接口都要带 |
+| `Authorization: Bearer <token>` | 不启用 | 设置 `WEB_AUTO_SKILL_API_TOKEN` 后，除 `/health` 外所有接口都要带 |
 | `page_key` 协议 | 只允许 http/https | `file://` 需要 `ALLOW_FILE_URL=true` |
 | `page_key` 目标 | 拒绝环回/内网/保留地址 | 访问自建 OA 需要 `ALLOW_PRIVATE_NETWORK=true` |
 | `steps` 内的 `goto` | 与 `page_key` 同一套校验 | 防「入口合法、步骤里跳去 file:// 或内网」 |
@@ -22,7 +22,7 @@
 
 ```bash
 curl -s -X POST localhost:8000/task/run \
-  -H "Authorization: Bearer $WEBSKILL_API_TOKEN" \
+  -H "Authorization: Bearer $WEB_AUTO_SKILL_API_TOKEN" \
   -H 'Content-Type: application/json' \
   -d '{"command":"填写报销单","page_key":"https://oa.example.com/new"}'
 ```

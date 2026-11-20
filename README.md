@@ -1,4 +1,4 @@
-# WebSkill
+# Web Auto Skill
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10%2B-3776AB.svg)](https://www.python.org/)
@@ -8,7 +8,7 @@
 
 第一次执行时由模型或本地规则规划步骤，执行轨迹被蒸馏成带页面指纹的参数化 Skill（`{{param.x}}`）；此后的同类任务直接命中 Skill 回放，不调用模型。页面改版时指纹失配，旧 Skill 废弃并重新规划。
 
-WebSkill 是上层 Agent 的执行后端，不负责理解意图：Agent 决定做什么、要不要问人，WebSkill 负责浏览器执行、Skill 版本管理、风险拦截与审计。
+Web Auto Skill 是上层 Agent 的执行后端，不负责理解意图：Agent 决定做什么、要不要问人，Web Auto Skill 负责浏览器执行、Skill 版本管理、风险拦截与审计。
 
 ## 特性
 
@@ -47,11 +47,11 @@ npx skills add jinshan3690/dsh-web-auto-skill
 npx -y github:jinshan3690/dsh-web-auto-skill setup
 ```
 
-它做三件事：建 `~/.webskill/.venv`、装引擎依赖、把 `web-auto-skill` 软链到已在 PATH 里的
+它做三件事：建 `~/.web-auto-skill/.venv`、装引擎依赖、把 `web-auto-skill` 软链到已在 PATH 里的
 可写目录（`~/.local/bin` → `/opt/homebrew/bin` → `/usr/local/bin`）。
 
 检测到你机器上已有 Chrome / Edge / Brave 时**跳过 Chromium 下载**；已装过时秒回，只补软链。
-要重装依赖加 `--force`，换安装目录设 `WEBSKILL_HOME`。
+要重装依赖加 `--force`，换安装目录设 `WEB_AUTO_SKILL_HOME`。
 
 验证：
 
@@ -59,8 +59,9 @@ npx -y github:jinshan3690/dsh-web-auto-skill setup
 web-auto-skill skill-list
 ```
 
-> 命令不在 PATH 时用绝对路径 `~/.webskill/.venv/bin/web-auto-skill`（早期版本是 `~/.webskill/venv/bin/`）。
-> 第二步若报 `ENOTEMPTY: directory not empty, rename …/webskill`，是 npx 缓存残留：
+> 命令不在 PATH 时用绝对路径 `~/.web-auto-skill/.venv/bin/web-auto-skill`
+> （早期装法目录名是 `venv`，没有点）。
+> 第二步若报 `ENOTEMPTY: directory not empty, rename …/web_auto_skill`，是 npx 缓存残留：
 > `rm -rf ~/.npm/_npx` 后重跑即可。
 
 要求：Python ≥ 3.10（引擎是 Python 写的，npx 只是安装入口），Node ≥ 18。
@@ -107,7 +108,7 @@ web-auto-skill web --port 8000
 | DELETE | `/skill/{id}` |
 | POST | `/skill/import`、`/skill/{id}/rollback`、`/inspect`、`/sample/contribute` |
 
-暴露到本机以外**必须**设 `WEBSKILL_API_TOKEN`，请求带 `Authorization: Bearer <token>`；`page_key` 默认只允许 http/https 与公网地址，访问内网 OA 要显式 `ALLOW_PRIVATE_NETWORK=true`。`steps` 里自带的 `goto` 走同一套校验，跳转后的落地地址也会再查一次（挡住 302 到内网）。字段与示例见 [`docs/api.md`](docs/api.md)，设计取舍见 [`docs/architecture.md`](docs/architecture.md)。
+暴露到本机以外**必须**设 `WEB_AUTO_SKILL_API_TOKEN`，请求带 `Authorization: Bearer <token>`；`page_key` 默认只允许 http/https 与公网地址，访问内网 OA 要显式 `ALLOW_PRIVATE_NETWORK=true`。`steps` 里自带的 `goto` 走同一套校验，跳转后的落地地址也会再查一次（挡住 302 到内网）。字段与示例见 [`docs/api.md`](docs/api.md)，设计取舍见 [`docs/architecture.md`](docs/architecture.md)。
 
 ## 风险与错误
 
@@ -133,9 +134,9 @@ web-auto-skill web --port 8000
 
 | 变量 | 默认 | 说明 |
 |---|---|---|
-| `STORAGE_ROOT` | `~/.webskill/storage` | 数据、截图、日志、模型；想放项目内就设 `./storage` |
-| `WEBSKILL_HOME` | `~/.webskill` | 引擎安装目录（venv 与数据） |
-| `WEBSKILL_API_TOKEN` | 空 | 设置后 HTTP 接口要求 Bearer token |
+| `STORAGE_ROOT` | `~/.web-auto-skill/storage` | 数据、截图、日志、模型；想放项目内就设 `./storage` |
+| `WEB_AUTO_SKILL_HOME` | `~/.web-auto-skill` | 引擎安装目录（venv 与数据） |
+| `WEB_AUTO_SKILL_API_TOKEN` | 空 | 设置后 HTTP 接口要求 Bearer token |
 | `ALLOW_PRIVATE_NETWORK` | `false` | 允许访问内网/环回地址 |
 | `ALLOW_FILE_URL` | `false` | 允许 `file://` 页面 |
 | `MAX_CONCURRENT_TASKS` | `2` | 同时执行的浏览器任务上限 |
@@ -161,15 +162,15 @@ web-auto-skill web --port 8000
 python3 -m venv .venv && source .venv/bin/activate
 pip install -e ".[onnx,dev]"
 playwright install chromium
-python -m webskill init
+python -m web_auto_skill init
 
 pytest -q                       # 101 项：单元 + 风险回归 + 真浏览器端到端
 ruff check .
 python examples/e2e_smoke.py    # 浏览器冒烟（打印每步风险判定）
 ```
 
-`bin/webskill.js` 是 `npx` 启动器（找 Python、准备 venv、转发给 `python -m webskill`），
-npm 包名 `web-auto-skill`；本地开发直接 `python -m webskill` 即可。
+`bin/web_auto_skill.js` 是 `npx` 启动器（找 Python、准备 venv、转发给 `python -m web_auto_skill`），
+npm 包名 `web-auto-skill`；本地开发直接 `python -m web_auto_skill` 即可。
 
 ## License
 

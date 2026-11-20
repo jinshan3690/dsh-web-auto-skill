@@ -8,11 +8,11 @@ import asyncio
 
 from conftest import requires_browser
 
-from webskill.browser.contract_scanner import _fingerprint_payload
-from webskill.browser.runner import MAX_WAIT_MS, _resolve_plan, execute_step
-from webskill.skill.skill_store import list_skills_any_scene, save_skill
-from webskill.trace.recorder import TraceRecorder
-from webskill.utils.db import get_conn
+from web_auto_skill.browser.contract_scanner import _fingerprint_payload
+from web_auto_skill.browser.runner import MAX_WAIT_MS, _resolve_plan, execute_step
+from web_auto_skill.skill.skill_store import list_skills_any_scene, save_skill
+from web_auto_skill.trace.recorder import TraceRecorder
+from web_auto_skill.utils.db import get_conn
 
 
 class TestFingerprintOrderInsensitive:
@@ -118,7 +118,7 @@ class TestSelectorDisambiguation:
         page_file.write_text(html, encoding="utf-8")
 
         async def _scan():
-            from webskill.browser.contract_scanner import scan_contract
+            from web_auto_skill.browser.contract_scanner import scan_contract
 
             async with async_playwright() as p:
                 browser = await p.chromium.launch(headless=True)
@@ -145,7 +145,7 @@ class TestReorderE2E:
 
         from playwright.async_api import async_playwright
 
-        from webskill.browser.contract_scanner import scan_contract
+        from web_auto_skill.browser.contract_scanner import scan_contract
 
         src = Path(__file__).parent.parent / "examples" / "demo_form.html"
         original = workdir / "orig.html"

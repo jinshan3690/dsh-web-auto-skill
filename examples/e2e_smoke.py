@@ -19,12 +19,12 @@ sys.path.insert(0, str(ROOT))
 
 from playwright.async_api import async_playwright
 
-from webskill.browser.contract_scanner import scan_contract
-from webskill.browser.runner import _run_plan
-from webskill.config import CHROMIUM_CHANNEL, ensure_dirs
-from webskill.skill.skill_store import match_skill, save_skill
-from webskill.trace.recorder import TraceRecorder
-from webskill.utils.db import init_db
+from web_auto_skill.browser.contract_scanner import scan_contract
+from web_auto_skill.browser.runner import _run_plan
+from web_auto_skill.config import CHROMIUM_CHANNEL, ensure_dirs
+from web_auto_skill.skill.skill_store import match_skill, save_skill
+from web_auto_skill.trace.recorder import TraceRecorder
+from web_auto_skill.utils.db import init_db
 
 DEMO_URL = (ROOT / "examples" / "demo_form.html").resolve().as_uri()
 
@@ -46,7 +46,7 @@ async def main():
         await page.close()
 
         # ---- 2. 写入种子 Skill（幂等：先清掉旧的 demo skill） ----
-        from webskill.utils.db import get_conn
+        from web_auto_skill.utils.db import get_conn
         with get_conn() as conn:
             conn.execute("DELETE FROM skills WHERE skill_id='skill-demo-reimburse'")
 

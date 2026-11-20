@@ -1,7 +1,7 @@
 [project]
-name = "webskill"
-version = "0.2.5"
-description = "WebSkill - 给 Agent 用的网页操作 Skill 引擎：跑一次、学一条、下次直接复用"
+name = "web-auto-skill"
+version = "0.3.0"
+description = "Web Auto Skill - 给 Agent 用的网页操作 Skill 引擎：跑一次、学一条、下次直接复用"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
@@ -34,7 +34,7 @@ Homepage = "https://github.com/jinshan3690/dsh-web-auto-skill"
 Issues = "https://github.com/jinshan3690/dsh-web-auto-skill/issues"
 
 [project.scripts]
-web-auto-skill = "webskill.cli:app"
+web-auto-skill = "web_auto_skill.cli:app"
 
 
 [build-system]
@@ -42,7 +42,7 @@ requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
-include = ["webskill*"]
+include = ["web_auto_skill*"]
 
 
 [tool.ruff]

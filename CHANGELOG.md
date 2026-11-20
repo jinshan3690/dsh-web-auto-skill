@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.3.0 (2026-11-20)
+
+### 破坏性变更
+包名与标识符全部统一到 `web-auto-skill`，不再有 `webskill` 这个名字：
+
+| 旧 | 新 |
+|---|---|
+| Python 包 `webskill` | `web_auto_skill`（目录与 import 路径） |
+| `python -m webskill` | `python -m web_auto_skill` |
+| `bin/webskill.js` | `bin/web-auto-skill.js` |
+| `WEBSKILL_*` 环境变量 | `WEB_AUTO_SKILL_*` |
+| `~/.webskill` 数据目录 | `~/.web-auto-skill` |
+
+升级注意：数据目录换了位置，旧的在 `~/.webskill`（`storage/` 里有已学的 Skill）。
+迁移方式：`mv ~/.webskill ~/.web-auto-skill`，再重跑一次 `npx -y github:jinshan3690/dsh-web-auto-skill setup`。
+
 ## v0.2.5 (2026-11-20)
 
 ### 变更

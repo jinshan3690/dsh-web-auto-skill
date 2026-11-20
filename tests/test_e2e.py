@@ -11,8 +11,8 @@ from pathlib import Path
 
 from conftest import requires_browser
 
-from webskill.browser.runner import run_task_detailed
-from webskill.utils.db import get_conn
+from web_auto_skill.browser.runner import run_task_detailed
+from web_auto_skill.utils.db import get_conn
 
 EXAMPLE = Path(__file__).parent.parent / "examples" / "demo_form.html"
 
@@ -112,8 +112,8 @@ class TestBranchConsumedOnce:
     def test_persistent_condition_fires_branch_only_once(self, workdir):
         from playwright.async_api import async_playwright
 
-        from webskill.browser.runner import _run_plan
-        from webskill.trace.recorder import TraceRecorder
+        from web_auto_skill.browser.runner import _run_plan
+        from web_auto_skill.trace.recorder import TraceRecorder
 
         html = """<!DOCTYPE html><html><body>
         <input id="a"><input id="b">

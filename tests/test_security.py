@@ -1,7 +1,7 @@
 """HTTP 入参安全校验：协议白名单 + 内网地址拒绝"""
 import pytest
 
-from webskill import security
+from web_auto_skill import security
 
 
 @pytest.fixture

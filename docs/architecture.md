@@ -119,7 +119,7 @@ run(cmd, page_key)
 所以候选是**按参数个数从少到多**逐个试，取第一个能渲染成功的。
 都不可用才重新规划，并把 `coverage_gap` 记进 trace 触发学习，补一条更合适的 Skill。
 
-这段逻辑抽在 `webskill/skill/selector.py`（纯函数，不碰浏览器），因此有独立单测：
+这段逻辑抽在 `web_auto_skill/skill/selector.py`（纯函数，不碰浏览器），因此有独立单测：
 覆盖度、可渲染、参数少优先、精确匹配去重。
 
 另外两点：
@@ -212,7 +212,7 @@ ONNX 通路为什么值得单独维护：PyTorch 在新版 Python 上经常没 w
 
 | 闸口 | 位置 | 拦住的场景 |
 |---|---|---|
-| `WEBSKILL_API_TOKEN` | `web/main.py` | 任何人连上端口就能驱动你的浏览器 |
+| `WEB_AUTO_SKILL_API_TOKEN` | `web/main.py` | 任何人连上端口就能驱动你的浏览器 |
 | 协议白名单（http/https） | `security.py` | `file:///etc/passwd` 读本地文件 |
 | 内网地址拒绝 | `security.py` | SSRF 打内网后台、`169.254.169.254` 云元数据 |
 | **每步导航校验** | `runner.check_nav_url` | `steps` 里自带的 `goto`、以及 302 之后的落地地址 |

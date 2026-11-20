@@ -11,7 +11,14 @@ fi
 
 source .venv/bin/activate
 pip install -q -e .
-playwright install chromium
+
+# 有系统 Chrome/Edge/Brave 就用它，别为本地调试再下 130MB Chromium
+if [ ! -d "/Applications/Google Chrome.app" ] \
+  && [ ! -d "/Applications/Microsoft Edge.app" ] \
+  && [ ! -d "/Applications/Brave Browser.app" ] \
+  && ! command -v google-chrome >/dev/null 2>&1; then
+  playwright install chromium
+fi
 
 if [ ! -f ".env" ]; then
   cp .env.example .env
@@ -19,10 +26,10 @@ if [ ! -f ".env" ]; then
 fi
 
 # 语义召回模型（22MB，可选；下载失败不影响使用，会自动降级）
-if ! python -c "from webskill.llm.embed_onnx import model_ready; raise SystemExit(0 if model_ready() else 1)" 2>/dev/null; then
-  echo "可选：python -m webskill embed-setup  （下载 22MB 中文向量模型，提升 Skill 召回精度）"
+if ! python -c "from web_auto_skill.llm.embed_onnx import model_ready; raise SystemExit(0 if model_ready() else 1)" 2>/dev/null; then
+  echo "可选：python -m web_auto_skill embed-setup  （下载 22MB 中文向量模型，提升 Skill 召回精度）"
 fi
 
-python -m webskill init
+python -m web_auto_skill init
 echo "启动 Web API：http://127.0.0.1:8000/docs"
-python -m webskill web
+python -m web_auto_skill web

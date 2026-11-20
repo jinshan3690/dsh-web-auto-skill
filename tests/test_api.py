@@ -5,15 +5,15 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from webskill.web import main as web
+from web_auto_skill.web import main as web
 
 
 @pytest.fixture
 def client(monkeypatch):
     """每个用例独立 token，避免受真实环境变量影响"""
     monkeypatch.setattr(web, "API_TOKEN", "test-token")
-    monkeypatch.setattr("webskill.security.ALLOW_FILE_URL", False)
-    monkeypatch.setattr("webskill.security.ALLOW_PRIVATE_NETWORK", False)
+    monkeypatch.setattr("web_auto_skill.security.ALLOW_FILE_URL", False)
+    monkeypatch.setattr("web_auto_skill.security.ALLOW_PRIVATE_NETWORK", False)
     with TestClient(web.app) as c:
         yield c
 

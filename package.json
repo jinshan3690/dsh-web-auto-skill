@@ -1,13 +1,13 @@
 {
   "name": "web-auto-skill",
-  "version": "0.2.5",
+  "version": "0.3.0",
   "description": "Web operation skill engine: drive a real browser, then replay parameterized skills without calling a model.",
   "bin": {
-    "web-auto-skill": "bin/webskill.js"
+    "web-auto-skill": "bin/web-auto-skill.js"
   },
   "files": [
     "bin",
-    "webskill",
+    "web_auto_skill",
     "examples",
     "docs",
     "pyproject.toml",

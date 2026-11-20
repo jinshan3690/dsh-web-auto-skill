@@ -3,8 +3,8 @@
 这两条校验是「执行成功但少填字段」的唯一防线，也决定复用会不会
 因为库里有条参数更多的 Skill 而直接 MISSING_PARAMS 失败。
 """
-from webskill.skill.parameterizer import render_skill_plan
-from webskill.skill.selector import candidate_pool, covers, select_usable
+from web_auto_skill.skill.parameterizer import render_skill_plan
+from web_auto_skill.skill.selector import candidate_pool, covers, select_usable
 
 A = {
     "skill_id": "s-a", "version": "v1",

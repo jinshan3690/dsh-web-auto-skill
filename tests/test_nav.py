@@ -7,15 +7,15 @@
 """
 import pytest
 
-from webskill.browser import runner
-from webskill.security import validate_page_url
+from web_auto_skill.browser import runner
+from web_auto_skill.security import validate_page_url
 
 
 @pytest.fixture(autouse=True)
 def strict_defaults(monkeypatch):
     """测试环境为了跑 file:// demo 放开了开关，这里恢复线上默认值"""
-    monkeypatch.setattr("webskill.security.ALLOW_FILE_URL", False)
-    monkeypatch.setattr("webskill.security.ALLOW_PRIVATE_NETWORK", False)
+    monkeypatch.setattr("web_auto_skill.security.ALLOW_FILE_URL", False)
+    monkeypatch.setattr("web_auto_skill.security.ALLOW_PRIVATE_NETWORK", False)
 
 
 class TestNavWhitelist:
@@ -37,11 +37,11 @@ class TestNavWhitelist:
 
     def test_public_url_passes(self, monkeypatch):
         # 不真做 DNS：这里验的是协议与字面量判断，解析结果交给真环境
-        monkeypatch.setattr("webskill.security._resolve_hosts", lambda host: [])
+        monkeypatch.setattr("web_auto_skill.security._resolve_hosts", lambda host: [])
         assert validate_page_url("https://example.com/a") == "https://example.com/a"
 
     def test_domain_resolving_to_private_is_rejected(self, monkeypatch):
-        monkeypatch.setattr("webskill.security._resolve_hosts", lambda host: ["192.168.1.9"])
+        monkeypatch.setattr("web_auto_skill.security._resolve_hosts", lambda host: ["192.168.1.9"])
         with pytest.raises(ValueError, match="解析到内网"):
             validate_page_url("http://intranet.example.com/x")
 
@@ -58,7 +58,7 @@ class TestStepGuard:
     def test_goto_to_public_ok(self, monkeypatch):
         import asyncio
 
-        monkeypatch.setattr("webskill.security._resolve_hosts", lambda host: [])
+        monkeypatch.setattr("web_auto_skill.security._resolve_hosts", lambda host: [])
         assert asyncio.run(runner.check_nav_url("https://example.com/x")) == ""
 
 
@@ -66,7 +66,7 @@ class TestFingerprintDrift:
     """「连续两次不同才弃用」—— 之前条件写反了，两个方向都错"""
 
     def _seed(self, page_key: str, skill_id: str):
-        from webskill.skill.skill_store import save_skill
+        from web_auto_skill.skill.skill_store import save_skill
 
         save_skill({
             "skill_id": skill_id, "version": "", "page_key": page_key,
@@ -76,7 +76,7 @@ class TestFingerprintDrift:
         })
 
     def _traces(self, page_key: str, fp: str, n: int = 1):
-        from webskill.utils.db import get_conn
+        from web_auto_skill.utils.db import get_conn
 
         with get_conn() as conn:
             for i in range(n):
@@ -87,13 +87,13 @@ class TestFingerprintDrift:
                 )
 
     def _alive(self, page_key: str) -> bool:
-        from webskill.skill.skill_store import list_skills_any_scene
+        from web_auto_skill.skill.skill_store import list_skills_any_scene
 
         return bool(list_skills_any_scene(page_key, "default"))
 
     def test_first_change_keeps_old_skill(self):
-        from webskill.browser.runner import _check_fingerprint_drift
-        from webskill.trace.recorder import TraceRecorder
+        from web_auto_skill.browser.runner import _check_fingerprint_drift
+        from web_auto_skill.trace.recorder import TraceRecorder
 
         page = "https://drift.example/once"
         self._seed(page, "skill-drift-1")
@@ -103,8 +103,8 @@ class TestFingerprintDrift:
         assert self._alive(page) is True
 
     def test_second_change_deprecates(self):
-        from webskill.browser.runner import _check_fingerprint_drift
-        from webskill.trace.recorder import TraceRecorder
+        from web_auto_skill.browser.runner import _check_fingerprint_drift
+        from web_auto_skill.trace.recorder import TraceRecorder
 
         page = "https://drift.example/twice"
         self._seed(page, "skill-drift-2")
@@ -114,8 +114,8 @@ class TestFingerprintDrift:
         assert self._alive(page) is False
 
     def test_no_history_keeps_old_skill(self):
-        from webskill.browser.runner import _check_fingerprint_drift
-        from webskill.trace.recorder import TraceRecorder
+        from web_auto_skill.browser.runner import _check_fingerprint_drift
+        from web_auto_skill.trace.recorder import TraceRecorder
 
         page = "https://drift.example/none"
         self._seed(page, "skill-drift-3")

@@ -1,5 +1,5 @@
 """学习阶段的「固化」行为：哪些东西能写进 Skill，哪些写了就永远命不中"""
-from webskill.skill.parameterizer import (
+from web_auto_skill.skill.parameterizer import (
     _stabilize_expect,
     parameterize_steps,
     render_skill_plan,
