@@ -27,6 +27,8 @@ const VENV_PY =
   process.platform === "win32"
     ? path.join(VENV_DIR, "Scripts", "python.exe")
     : path.join(VENV_DIR, "bin", "python");
+// npx 安装的数据放用户目录（缓存可能被清理）；源码安装沿用项目内 storage
+const DEFAULT_STORAGE = IS_NPX_CACHE ? path.join(DATA_HOME, "storage") : path.join(ROOT, "storage");
 
 const info = (msg) => process.stderr.write(`[webskill] ${msg}\n`);
 
@@ -70,7 +72,7 @@ function venvReady() {
 }
 
 function setup({ force = false } = {}) {
-  fs.mkdirSync(path.join(DATA_HOME, "storage"), { recursive: true });
+  fs.mkdirSync(DEFAULT_STORAGE, { recursive: true });
 
   if (force && fs.existsSync(VENV_DIR) && venvReady()) {
     info("更新依赖…");
@@ -101,12 +103,12 @@ function setup({ force = false } = {}) {
   info("安装 Chromium（playwright，约 130MB）…");
   // 必须在项目目录之外执行：本仓库根有 package.json，playwright 的 Python CLI 会误认为
   // 这是 Node 项目并转发给 npm 版 CLI，导致安装被跳过。
-  const browserHost = path.join(DATA_HOME, "storage");
+  const browserHost = DEFAULT_STORAGE;
   if (run(VENV_PY, ["-m", "playwright", "install", "chromium"], {}, browserHost) !== 0) {
     info("Chromium 安装失败；若本机已有 Chrome/Brave，可设 CHROMIUM_CHANNEL=chrome 后继续");
   }
 
-  info(`完成。数据目录：${path.join(DATA_HOME, "storage")}`);
+  info(`完成。数据目录：${DEFAULT_STORAGE}`);
 }
 
 function ensure() {
@@ -130,7 +132,7 @@ function main() {
 
   ensure();
   return run(VENV_PY, ["-m", "src", ...args], {
-    STORAGE_ROOT: process.env.STORAGE_ROOT || path.join(DATA_HOME, "storage"),
+    STORAGE_ROOT: process.env.STORAGE_ROOT || DEFAULT_STORAGE,
     PYTHONPATH: ROOT,
   });
 }

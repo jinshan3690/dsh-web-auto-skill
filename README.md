@@ -188,7 +188,7 @@ OPENAI_MODEL=qwen2.5:7b
 
 | 变量 | 默认 | 说明 |
 |---|---|---|
-| `STORAGE_ROOT` | `./storage` | 数据库、截图、审计日志、模型目录 |
+| `STORAGE_ROOT` | `./storage` | 数据库、截图、审计日志、模型目录。npx 安装时为 `~/.webskill/storage` |
 | `LLM_PROVIDER` | `auto` | `auto` / `none` / `external` |
 | `OPENAI_BASE_URL` `OPENAI_MODEL` `OPENAI_API_KEY` | — | 模型端点（Key 可选） |
 | `EMBED_BACKEND` | `auto` | `auto` / `onnx` / `sbert` / `ngram` |
