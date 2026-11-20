@@ -51,6 +51,8 @@ npx skills add jinshan3690/dsh-web-auto-skill -l                 # 只列出仓�
 npx -y github:jinshan3690/dsh-web-auto-skill install-agent
 ```
 
+两者区别：`skills` CLI 把 skill 装到 `~/.agents/skills` 并 symlink 给 Codex、Cursor、Copilot、Cline 等 19+ 编码 Agent；`install-agent` 额外覆盖豆包（Doubao）等本地 Agent 的 skills 目录，也可 `--list` 只看探测结果、或传目录只装一处。两者可同时用，内容一致。
+
 ### 2. 准备运行时
 
 ```bash
