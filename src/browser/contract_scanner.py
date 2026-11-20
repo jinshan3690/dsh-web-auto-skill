@@ -109,3 +109,33 @@ async def scan_contract(page: Page) -> dict:
         "contract": result,
         "fingerprint": fingerprint,
     }
+
+
+HUMAN_GATE_JS = """
+() => {
+  const vis = (el) => {
+    if (!el) return false;
+    const r = el.getBoundingClientRect();
+    return r.width > 0 && r.height > 0;
+  };
+  for (const p of document.querySelectorAll('input[type=password]')) {
+    if (vis(p) && !p.disabled) return 'login';
+  }
+  const txt = (document.body && document.body.innerText || '').slice(0, 4000);
+  if (/验证码|captcha|滑块验证|安全验证|人机验证/i.test(txt)) return 'captcha';
+  if (/请[先登]{1,2}录|登录后(继续|查看)|账号登录|扫码登录/.test(txt)) return 'login';
+  return '';
+}
+"""
+
+
+async def detect_human_gate(page: Page) -> str:
+    """检测「需要人工介入」的页面状态：登录 / 验证码。
+
+    返回 "login" / "captcha" / ""。
+    设计取舍：本工具不代客登录、不持久化会话，检测到就提示用户亲自在浏览器里完成。
+    """
+    try:
+        return await page.evaluate(HUMAN_GATE_JS) or ""
+    except Exception:
+        return ""

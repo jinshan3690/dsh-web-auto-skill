@@ -125,8 +125,12 @@ def cmd_contract(
 @app.command("health")
 def cmd_health():
     """查看服务与 LLM 状态"""
+    from src.llm.embed import backend_detail
     from src.llm.provider import describe
-    console.print_json(json.dumps(describe(), ensure_ascii=False))
+
+    info = describe()
+    info["embed"] = backend_detail()
+    console.print_json(json.dumps(info, ensure_ascii=False))
 
 
 @app.command("skill-list")
@@ -275,6 +279,27 @@ def cmd_web(host: str = "127.0.0.1", port: int = 8000, reload: bool = False):
     ensure_dirs()
     init_db()
     uvicorn.run("src.web.main:app", host=host, port=port, reload=reload)
+
+
+@app.command("embed-setup")
+def cmd_embed_setup(
+    force: bool = typer.Option(False, "--force", help="已存在也重新下载"),
+    endpoint: str = typer.Option(None, "--endpoint", help="模型源，默认 hf-mirror"),
+):
+    """下载本地 ONNX 中文向量模型（约 22MB，无需 PyTorch）"""
+    from src.llm.embed_setup import download
+
+    try:
+        info = download(force=force, endpoint=endpoint)
+    except Exception as e:
+        console.print(f"[red]下载失败: {e}[/red]")
+        console.print("可手动设置 HF_ENDPOINT 换源，或直接跳过（会降级为 n-gram 检索）")
+        raise typer.Exit(1)
+    console.print(info)
+
+    from src.llm.embed import backend_detail
+
+    console.print(backend_detail())
 
 
 @app.command("audit")

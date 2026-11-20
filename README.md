@@ -59,17 +59,27 @@ cp .env.example .env
 python -m src init
 ```
 
-### 语义检索（可选）
+### 语义检索（推荐 ONNX 版，22MB，不依赖 PyTorch）
 
 ```bash
-pip install -e ".[embed]"
+pip install onnxruntime tokenizers huggingface_hub
+python -m src embed-setup        # 从 hf-mirror 拉 22MB int8 模型
 ```
 
-装了 `sentence-transformers` 后使用 `BAAI/bge-small-zh-v1.5` 做语义召回；
-**不装也能跑**，会自动降级为字符 n-gram 相似度（精度下降，功能不中断）。
+之后语义召回就用 `BAAI/bge-small-zh-v1.5`（512 维，CPU 单句 0.6ms，2 线程）。
+模型落在 `storage/models/bge-small-zh-v1.5/`，一次性下载，之后离线可用。
 
-> 注意：`sentence-transformers` 依赖 PyTorch，对 Python 版本敏感。
-> 若你的环境是 **Python 3.14**（当前默认解释器），PyTorch 暂无 wheel，请用 Python 3.11 / 3.12 的虚拟环境安装 embed 依赖。核心功能不受影响，可先用降级模式。
+```bash
+python -m src health     # 看 embed.backend 是不是 onnx
+python -m src skill-search "差旅报销单怎么填" --top-k 3
+```
+
+后端优先顺序（`EMBED_BACKEND=auto`）：**onnx → sentence-transformers → n-gram**。
+哪层都没有也能跑，只是召回精度下降，功能不中断。
+
+- 没有 HuggingFace 网络：`HF_ENDPOINT=https://hf-mirror.com python -m src embed-setup`
+- 想用老方案：`pip install -e ".[embed]"`（需 PyTorch，仅 3.11/3.12 有 wheel）
+- 不想占 CPU：`EMBED_THREADS=1`
 
 ## 免 API Key 模式（交给上层 Agent 直接调用）
 
@@ -164,6 +174,8 @@ python -m src web
 | `skill-search <query>` | 语义检索 |
 | `skill-rollback <id> <version>` | 版本回滚 |
 | `trace-list` / `trace-show <id>` | 执行轨迹 |
+| `embed-setup` | 下载本地 ONNX 中文向量模型（22MB，`--force` 重下、`--endpoint` 换源） |
+| `health` | LLM 与向量后端状态 |
 | `inspect` | 手动批量巡检（`--show` 弹出窗口） |
 | `inspect-deprecated` | 列出失效 Skill |
 | `sample-contribute <id>` | 脱敏贡献样本 |
@@ -210,12 +222,32 @@ Agent 负责理解人话，这里负责稳定执行、参数化复用、风险�
 
 - **critical**（审批通过 / 驳回 / 付款 / 转账 / 删除账号…）：任何情况下**不自动执行**，执行层硬拦截。
 - **high**（提交 / 保存 / 删除 / 上传…）：CLI 交互确认；HTTP 接口下默认阻断，需在调用方加审批环节。
+- **人工闸口**：检测到页面要求登录或出现验证码，直接停手并抛出
+  `NEED_HUMAN: 页面要求登录，请在浏览器窗口中手动登录后重试`。
+  不代客登录、不保存会话——浏览器本来就是有头的，用户自己点两下就好。
+  关闭该检测：`HUMAN_HINT=false`。
 - 失败轨迹默认不学习，避免把错误流程沉淀成 Skill。
+
+## 错误码约定（调用方判断用）
+
+| 错误 | 含义 | 处理建议 |
+|---|---|---|
+| `NEED_HUMAN: …` | 登录/验证码，需人工介入 | 切有头模式，让用户在窗口里完成 |
+| `MISSING_PARAMS: …` | 命中参数化 Skill 但参数没填满 | 按提示补 `params` |
+| `NO_PLANNER: …` | 无模型、规则也规划不出来 | 改用 `/task/execute` 传 steps |
+| `CRITICAL_BLOCK: …` | 命中审批/资金类动作 | 人工执行，系统不会代做 |
 
 ## 后续可迭代
 
-- [ ] 登录态 / Cookie 持久化、多账号隔离
-- [ ] 验证码 / 人机验证中断与人工接管
-- [ ] iframe / shadow DOM 深度定位
+明确不做的（已经拍过板）：
+
+- ~~登录态 / Cookie 持久化、多账号隔离~~ —— 不做。浏览器就是用户自己的，有问题用户自己点，我们只提示（已实现 `NEED_HUMAN`）
+- ~~验证码 / 人机验证自动破解~~ —— 不做，同上，只检测+提示
+- ~~为 iframe / 上传 / 弹窗专门加动作类型~~ —— 不加。动作集保持 8 个，缺的能力靠"执行→失败→重规划→学习"补齐
+
+值得做的：
+
+- [ ] iframe / shadow DOM 的**自动**定位（不是加动作，是让契约扫描能穿透）
 - [ ] 多租户与浏览器池并发控制
 - [ ] Skill 灰度发布与 A/B 校验
+- [ ] 学习质量评估集：一批页面跑完，统计复用命中率与失败率

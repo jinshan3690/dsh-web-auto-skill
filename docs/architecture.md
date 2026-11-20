@@ -111,7 +111,24 @@ planner / reflector 的 system prompt 明确禁止生成审批类动作。
 做法：BGE 中文小模型先把自然语言指令 → 向量，与所有 Skill 文本向量比对，取 top-k 再交给 LLM 决策。
 
 - 这一步**不消耗 LLM token**
-- 未安装 `sentence-transformers` 时自动降级为「字符 2-gram 余弦」，功能不中断（精度下降）
+- 后端三层（`EMBED_BACKEND=auto` 时按序探测）：
+
+| 后端 | 依赖 | 体积 | 延迟 | 说明 |
+|---|---|---|---|---|
+| `onnx` | onnxruntime + tokenizers | 22MB int8 | 0.6ms/句（2 线程） | 默认，任何 Python 版本可装，离线可用 |
+| `sbert` | sentence-transformers | 需 PyTorch | ~5ms/句 | 老版本 Python 才装得上 |
+| `ngram` | 无 | 0 | <0.1ms | 字符 2-gram 余弦，纯兜底 |
+
+ONNX 通路为什么值得单独维护：PyTorch 在新版 Python 上经常没 wheel（3.14 就没有），
+而 onnxruntime 有全平台 wheel。模型文件（`model_int8.onnx` + `tokenizer.json`）由
+`python -m src embed-setup` 一次拉取，落在 `storage/models/bge-small-zh-v1.5/`，
+不引入任何 npm/JS 生态。
+
+推理细节：WordPiece 分词 → `input_ids/attention_mask/token_type_ids` → `last_hidden_state`
+→ **CLS pooling** → L2 归一化，余弦即点积。线程数由 `EMBED_THREADS` 控制（默认 2），
+避免后台辅助功能抢占用户 CPU。
+
+实测（同一批中文句子）：近义 0.85 / 无关 0.27，区分度足够做 top-k 召回。
 
 ## 零依赖规划与参数化（无 API Key 也有"有 key 效果"）
 

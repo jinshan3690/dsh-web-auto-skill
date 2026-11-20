@@ -43,10 +43,24 @@ Content-Type: application/json
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| GET | `/health` | 返回 `llm_available`，判断本服务是否需要外部提供规划 |
+| GET | `/health` | 返回 `llm_available` 与 `embed.backend`，判断本服务是否需要外部提供规划、语义召回是否走真模型 |
 | GET | `/page/contract?url=...` | 只扫契约 + 指纹，不执行，供 Agent 自行规划 |
 | POST | `/task/execute` | 纯执行给定 steps，完全不依赖 LLM |
 | POST | `/skill/import` | 外部蒸馏好的 Skill 直接入库 |
+
+`/health` 返回示例：
+
+```json
+{
+  "status": "ok",
+  "provider": "auto",
+  "llm_available": false,
+  "key_required": true,
+  "embed": { "backend": "onnx", "preferred": "auto", "onnx_ready": true }
+}
+```
+
+`embed.backend` 为 `onnx` / `sbert` / `ngram`，后两者精度依次下降但功能不中断。
 
 `POST /task/execute` 示例：
 
@@ -127,3 +141,14 @@ Content-Type: application/json
 | critical | 审批 / 驳回 / 付款 / 转账 | **永远阻断**，人工执行 |
 
 > 通过 HTTP 调用时没有交互终端，`high` 动作会直接判为阻断；生产接入建议在调用方 Agent 侧设计审批环节，确认后再重试。
+
+## 错误返回约定
+
+| error 前缀 | 含义 | 调用方应做什么 |
+|---|---|---|
+| `NEED_HUMAN:` | 页面需要登录或验证码 | 提示用户在有头浏览器窗口内完成，然后重试 |
+| `MISSING_PARAMS:` | 参数化 Skill 缺参数 | 按 message 里列出的字段名补 `params` |
+| `NO_PLANNER:` | 无模型且规则规划失败 | 改用 `/task/execute` 传 steps |
+| `CRITICAL_BLOCK:` | 审批/资金类动作被硬拦截 | 人工执行，系统不会代做 |
+
+这些错误都不会被学习成 Skill（失败轨迹默认不沉淀）。

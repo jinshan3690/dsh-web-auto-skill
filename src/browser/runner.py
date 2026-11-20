@@ -9,12 +9,13 @@ from tenacity import retry, stop_after_attempt, wait_fixed
 
 from src.audit.logger import audit_log
 from src.browser.branch_resolver import resolve_branch
-from src.browser.contract_scanner import scan_contract
+from src.browser.contract_scanner import detect_human_gate, scan_contract
 from src.browser.interceptor import check_action
 from src.browser.risk_detector import detect_risk
 from src.config import (
     AUTO_LEARN, BROWSER_HEADLESS, CHROMIUM_CHANNEL, PAGE_LOAD_TIMEOUT,
-    SCREENSHOT_DIR, SEMANTIC_TOP_K, SKILL_MATCH_THRESHOLD, STEP_TIMEOUT, ensure_dirs,
+    HUMAN_HINT, SCREENSHOT_DIR, SEMANTIC_TOP_K, SKILL_MATCH_THRESHOLD, STEP_TIMEOUT,
+    ensure_dirs,
 )
 from src.llm.planner import plan_task
 from src.llm.local_planner import PlanningError, plan_locally
@@ -231,6 +232,19 @@ async def run_task_detailed(
             scanned = await scan_contract(page)
             contract, fingerprint = scanned["contract"], scanned["fingerprint"]
             recorder.set_meta("fingerprint", fingerprint)
+
+            # ---------- 人工闸口：登录 / 验证码 ----------
+            # 不代客登录、不持久化会话。浏览器是有头的，用户自己操作，我们只负责说清楚。
+            gate = await detect_human_gate(page) if HUMAN_HINT else ""
+            if gate:
+                recorder.set_meta("human_gate", gate)
+                audit_log("human_gate", page_key, f"检测到需要人工介入：{gate}")
+                tip = (
+                    "页面要求登录，请在浏览器窗口中手动登录后重试"
+                    if gate == "login"
+                    else "页面出现验证码/人机验证，请在浏览器窗口中手动完成后重试"
+                )
+                raise ValueError(f"NEED_HUMAN: {tip}（headless 模式下请改用有头浏览器）")
 
             # ---------- 懒校验：现场比对指纹 ----------
             skill = match_skill(page_key, role, scene_tag, fingerprint)

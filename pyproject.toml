@@ -18,8 +18,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# 安装语义检索（BGE），需要 torch，体积较大
-# pip install -e ".[embed]"
+# 推荐：ONNX 版中文向量，22MB，无需 PyTorch，任何 Python 版本都能装
+# pip install -e ".[onnx]"
+onnx = ["onnxruntime>=1.20", "tokenizers>=0.15", "huggingface_hub>=0.23"]
+# 备选：sentence-transformers 版（需要 PyTorch，仅老版本 Python 有 wheel）
 embed = ["sentence-transformers>=3.0"]
 dev = ["pytest>=8.0"]
 

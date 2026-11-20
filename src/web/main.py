@@ -54,7 +54,9 @@ class ImportSkillRequest(BaseModel):
 
 @app.get("/health")
 def api_health():
-    return {"status": "ok", **llm_describe()}
+    from src.llm.embed import backend_detail
+
+    return {"status": "ok", **llm_describe(), "embed": backend_detail()}
 
 
 @app.post("/task/run")

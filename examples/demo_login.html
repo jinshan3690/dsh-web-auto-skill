@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<title>登录 - 企业报销系统</title>
+<style>
+  body { font-family: -apple-system, "PingFang SC", sans-serif; background: #f5f7fa; margin: 0; }
+  .box { width: 360px; margin: 12vh auto; background: #fff; padding: 32px; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,.08); }
+  h1 { font-size: 20px; margin: 0 0 20px; }
+  label { display: block; font-size: 13px; color: #666; margin: 12px 0 6px; }
+  input { width: 100%; box-sizing: border-box; padding: 9px 10px; border: 1px solid #dcdfe6; border-radius: 4px; font-size: 14px; }
+  button { margin-top: 20px; width: 100%; padding: 10px; background: #2f6fed; color: #fff; border: 0; border-radius: 4px; font-size: 15px; cursor: pointer; }
+</style>
+</head>
+<body>
+<div class="box">
+  <h1>账号登录</h1>
+  <p style="color:#999;font-size:13px">请使用企业账号登录后继续填写报销单</p>
+  <label for="account">账号</label>
+  <input id="account" name="account" placeholder="请输入企业账号" />
+  <label for="password">密码</label>
+  <input id="password" name="password" type="password" placeholder="请输入密码" />
+  <button id="loginBtn">登录</button>
+</div>
+</body>
+</html>

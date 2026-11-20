@@ -137,3 +137,18 @@ class TestLocalPlanner:
         rendered = render_steps(new_steps, {"applicant": "李四", "amount": "1200"})
         assert rendered[0]["value"] == "李四"
         assert rendered[1]["value"] == "1200"
+
+
+class TestSemanticRecall:
+    """语义召回：近义句必须比无关句更接近（不依赖 LLM token）。"""
+
+    def test_onnx_or_ngram_separates_meaning(self):
+        from src.llm.embed import backend_name, cosine, embed_one
+
+        q = embed_one("差旅报销单怎么填", is_query=True)
+        near = embed_one("填写差旅费报销单并保存草稿")
+        far = embed_one("查询股票行情并导出报表")
+        assert cosine(q, near) > cosine(q, far)
+        # 近义应该显著高于无关，避免后端退化后静默失效
+        assert cosine(q, near) - cosine(q, far) > 0.1
+        assert backend_name() in ("onnx", "sbert", "ngram")
