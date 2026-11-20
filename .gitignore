@@ -29,3 +29,6 @@ storage/
 # node（npx launcher）
 node_modules/
 package-lock.json
+
+# 本机工具目录
+.workbuddy/
