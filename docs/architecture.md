@@ -33,7 +33,6 @@
 │  reflector         Trace → Skill 蒸馏          │
 │  parameterizer     值 → {{param.x}} 模板化     │
 │  skill_store       版本链 / 精准匹配 / 语义召回  │
-│  dry_run           候选 Skill 探活             │
 └──────────────────┬──────────────────────────┘
                    │
 ┌──────────────────▼──────────────────────────┐
@@ -69,7 +68,7 @@ run(cmd, page_key)
   │         └─ 调用 planner 生成新 steps
   ├─ 逐步执行（风险拦截 + 分支）
   ├─ 截图 + trace 落库
-  └─ decide_learn() → 是 → reflect_trace() → dry_run() → save_skill()
+  └─ decide_learn() → 是 → reflect_trace() → save_skill()
 ```
 
 **不跑后台定时巡检**，只在真正要执行的时候现场校验——省资源，也避免"体检"式的无效浏览器开销。

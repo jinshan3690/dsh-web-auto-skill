@@ -56,9 +56,14 @@ Content-Type: application/json
   "provider": "auto",
   "llm_available": false,
   "key_required": true,
+  "fallback_planner": "local_rules",
+  "planners": ["external_steps", "local_rules", "llm"],
   "embed": { "backend": "onnx", "preferred": "auto", "onnx_ready": true }
 }
 ```
+
+`key_required` 只对「本服务自己规划」这一路生效；上层 Agent 用 `/task/execute` 传 steps 永远不需要 key。
+`llm_available=false` 时会自动走 `local_rules` 规划器。
 
 `embed.backend` 为 `onnx` / `sbert` / `ngram`，后两者精度依次下降但功能不中断。
 

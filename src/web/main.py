@@ -11,10 +11,9 @@ from pydantic import BaseModel
 from src.audit.logger import audit_log
 from src.browser.runner import inspect_contract, run_task_detailed
 from src.llm.provider import describe as llm_describe
-from src.skill.skill_store import save_skill
-from src.skill.inspector import inspect_all, list_deprecated
-from src.skill.skill_store import get_skill, rollback_skill, semantic_recall
 from src.sample.sample_store import contribute_sample, list_samples, semantic_search_samples
+from src.skill.inspector import inspect_all, list_deprecated
+from src.skill.skill_store import get_skill, rollback_skill, save_skill, semantic_recall
 from src.utils.db import get_conn, init_db
 
 app = FastAPI(title="WebSkill API", version="0.1.0")

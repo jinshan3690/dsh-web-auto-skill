@@ -38,10 +38,11 @@ dsh-web-auto-skill/
 │   ├── skill/
 │   │   ├── skill_store.py      # 版本链 / 精准匹配 / 语义召回 / 回滚
 │   │   ├── engine.py           # 自动学习决策器 + trace 压缩
-│   │   ├── dry_run.py          # 候选 Skill 探活校验
 │   │   └── inspector.py        # 手动批量巡检（可选管理员工具）
 │   ├── sample/sample_store.py  # 脱敏样本库
 │   └── web/main.py             # FastAPI 接口
+├── skill/install.sh            # 把 web-auto 装进任一 Agent 的 skills 目录
+├── skill/web-auto/SKILL.md     # Agent 侧入口说明（/web-auto）
 ├── storage/                    # 运行产物（db / 截图 / 日志）
 └── tests/
 ```
@@ -54,10 +55,11 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -e .
 playwright install chromium
-cp .env.example .env
-# 编辑 .env，填入 OPENAI_API_KEY / OPENAI_BASE_URL / OPENAI_MODEL
+cp .env.example .env      # 可选；不配 API Key 也能跑（见下节）
 python -m src init
 ```
+
+也可 `pip install -e ".[onnx]"` 后直接用 `webskill` 命令代替 `python -m src`。
 
 ### 语义检索（推荐 ONNX 版，22MB，不依赖 PyTorch）
 
@@ -147,6 +149,25 @@ python -m src run "填写报销单" "$DEMO_URL" --scene auto --params '{"applica
 通过 `/page/contract` + `/task/execute` 传步骤。这不是缺陷，是刻意保留的降级梯度：
 有模型走模型，没模型走规则，都没有就走外部 steps。
 
+## 在 Agent 里当作一个 Skill 用（`/web-auto`）
+
+仓库自带 Agent 侧适配层：`skill/web-auto/SKILL.md`。装到 Agent 的 skills 目录后，用户说
+「帮我在这个网页上填表」「把上次那个流程再跑一遍」时 Agent 会自动触发，也可以直接 `/web-auto`。
+
+```bash
+# macOS 豆包 Agent（默认路径）
+./skill/install.sh
+# 其他 Agent，指定 skills 目录即可
+./skill/install.sh ~/.claude/skills
+```
+
+`SKILL.md` 只写「怎么调用 + 怎么读结果 + 错误码怎么处理」，不含实现细节，避免占用 Agent 上下文：
+
+- `run "<指令>" <url> --scene <tag>`：Agent 只给意图，引擎自己规划（无 key 也能跑）
+- `execute <url> --plan-file steps.json`：Agent 自己规划，引擎只负责执行
+- `contract <url>`：只返回控件契约 + 指纹，Agent 拿去规划
+- 约定：`NEED_HUMAN` 停手交还用户、`CRITICAL_BLOCK` 绝不绕过、同页面连败两次就汇报不瞎试
+
 ## 快速开始
 
 ```bash
@@ -198,10 +219,15 @@ GET  /skill/recall?q=...&top_k=3
 GET  /traces          执行轨迹列表
 GET  /trace/{id}      轨迹详情
 POST /inspect         手动巡检
+GET  /inspect/deprecated  已失效 Skill 列表
+GET  /samples         样本列表
 GET  /samples/search?q=...
 POST /sample/contribute?skill_id=...
 GET  /audit
 ```
+
+`GET /health` 里 `key_required` 只针对「WebSkill 自己规划」这一路；
+上层 Agent 用 `/task/execute` 传 steps 时永远不需要 key。`planners` 字段列出三条规划路径。
 
 ## 与现有开源项目的关系（同思路的都存在）
 

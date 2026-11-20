@@ -59,5 +59,8 @@ def describe() -> dict:
         "llm_available": llm_available(),
         "base_url": OPENAI_BASE_URL,
         "endpoint_is_custom": endpoint_is_custom(),
+        # 仅表示「WebSkill 自己规划」是否需要 key；上层 Agent 传 steps 永远不需要
         "key_required": not endpoint_is_custom(),
+        "fallback_planner": "local_rules",
+        "planners": ["external_steps", "local_rules", "llm"],
     }

@@ -25,9 +25,23 @@ embed = ["sentence-transformers>=3.0"]
 dev = ["pytest>=8.0"]
 
 
+[project.scripts]
+webskill = "src.cli:app"
+
+
 [build-system]
 requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 include = ["src*"]
+
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+# 中文项目：不启用 RUF001-003（全角标点）与 S/BLE（刻意宽泛捕获）
+select = ["F", "E9", "B", "I"]
+ignore = ["RUF059"]

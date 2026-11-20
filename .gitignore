@@ -22,5 +22,6 @@ storage/
 .idea/
 .vscode/
 
-# 测试缓存
+# 测试 / lint 缓存
 .pytest_cache/
+.ruff_cache/

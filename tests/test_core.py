@@ -1,8 +1,8 @@
 """核心逻辑单元测试（不依赖浏览器 / LLM 网络）"""
 
 
-from src.browser.risk_detector import detect_risk
 from src.browser.interceptor import check_action
+from src.browser.risk_detector import detect_risk
 from src.skill.engine import condense_steps, decide_learn
 
 

@@ -2,7 +2,7 @@
 import asyncio
 import traceback
 import uuid
-from typing import Callable, Awaitable
+from typing import Awaitable, Callable
 
 from playwright.async_api import Page, async_playwright
 
@@ -12,20 +12,32 @@ from src.browser.contract_scanner import detect_human_gate, scan_contract
 from src.browser.interceptor import check_action
 from src.browser.risk_detector import detect_risk
 from src.config import (
-    AUTO_LEARN, BROWSER_HEADLESS, CHROMIUM_CHANNEL, PAGE_LOAD_TIMEOUT,
-    HUMAN_HINT, SCREENSHOT_DIR, STEP_TIMEOUT,
+    AUTO_LEARN,
+    BROWSER_HEADLESS,
+    CHROMIUM_CHANNEL,
+    HUMAN_HINT,
+    PAGE_LOAD_TIMEOUT,
+    SCREENSHOT_DIR,
+    STEP_TIMEOUT,
     ensure_dirs,
 )
-from src.llm.planner import plan_task
 from src.llm.local_planner import PlanningError, plan_locally
+from src.llm.planner import plan_task
 from src.llm.provider import llm_available
-from src.skill.parameterizer import (
-    extract_params_from_cmd, has_unresolved, parameterize_steps, render_steps,
-)
 from src.llm.reflector import reflect_trace
 from src.skill.engine import condense_steps, decide_learn
+from src.skill.parameterizer import (
+    extract_params_from_cmd,
+    has_unresolved,
+    parameterize_steps,
+    render_steps,
+)
 from src.skill.skill_store import (
-    candidates_by_fp, deprecate_skill, list_skills_any_scene, match_skill, save_skill,
+    candidates_by_fp,
+    deprecate_skill,
+    list_skills_any_scene,
+    match_skill,
+    save_skill,
 )
 from src.trace.recorder import TraceRecorder
 

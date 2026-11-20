@@ -10,7 +10,7 @@ from src.audit.logger import audit_log
 from src.browser.interceptor import confirm_high_risk
 from src.browser.runner import inspect_contract, run_task_detailed
 from src.config import ensure_dirs
-from src.sample.sample_store import contribute_sample, semantic_search_samples, list_samples
+from src.sample.sample_store import contribute_sample, list_samples, semantic_search_samples
 from src.skill.inspector import inspect_all, list_deprecated
 from src.skill.skill_store import get_skill, rollback_skill, semantic_recall
 from src.utils.db import get_conn, init_db
